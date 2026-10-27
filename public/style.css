@@ -1,0 +1,20 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0 auto; max-width: 920px; padding: 1.5rem 1rem 3rem; line-height: 1.5; }
+header h1 { margin-bottom: .2rem; }
+.sub { opacity: .85; }
+.banner { background: #7c2d12; color: #fff; padding: .6rem .9rem; border-radius: .5rem; font-weight: 600; }
+section { border: 1px solid #8884; border-radius: .7rem; padding: 1rem 1.2rem; margin: 1.2rem 0; }
+textarea { width: 100%; font: inherit; padding: .6rem; border-radius: .4rem; }
+.gate { padding: .45rem 0; border-bottom: 1px dashed #8883; }
+.pass { color: #15803d; font-weight: 700; } .fail { color: #dc2626; font-weight: 700; } .warn { color: #d97706; font-weight: 700; }
+.disposition { font-weight: 700; padding: .7rem .9rem; border-radius: .5rem; }
+.disposition.held { background: #7f1d1d; color: #fff; }
+.disposition.ok { background: #14532d; color: #fff; }
+fieldset label { display: block; margin: .35rem 0; }
+button { font: inherit; padding: .55rem 1rem; border-radius: .5rem; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.claim { border: 1px solid #8884; border-radius: .6rem; padding: .8rem 1rem; margin: .7rem 0; }
+.claim.contested { border-color: #dc2626; }
+.crumb { font-size: .9rem; padding: .5rem 0; border-bottom: 1px dashed #8883; }
+.note { font-size: .92rem; opacity: .85; }
+footer { font-size: .88rem; opacity: .8; margin-top: 2rem; }

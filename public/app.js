@@ -1,0 +1,185 @@
+// The Trivial Pass, Made Real — client logic.
+// Pipeline: debrief -> Nine Gates (Gate 9 decides) -> extraction -> sightings
+// -> claims in a minimal Twin -> contest -> warrant trail. Synthetic only.
+
+const LEARNERS = [
+  { id: 'L1', name: 'Amara (SYNTHETIC)' },
+  { id: 'L2', name: 'Ben (SYNTHETIC)' },
+  { id: 'L3', name: 'Cora (SYNTHETIC)' },
+];
+const SAMPLE = `Amara explained to her group why the water cycle diagram needed arrows both ways, and two classmates copied her reasoning into their notebooks. Ben finished the fraction worksheet quickly but when I asked him to show 3/4 with the paper strips he folded them into eighths instead and looked unsure. Cora asked three times whether her poster was "right" before she would start, then produced the most careful labelled diagram in the class once she began.`;
+
+const GATES_1_8 = [
+  ['Gate 1 — Enumerability', 'Pass', 'The channel is named in one sentence a family can read.'],
+  ['Gate 2 — Scoping', 'Pass', 'Teacher-initiated, after class, by a visible act.'],
+  ['Gate 3 — Observation Purity', 'Pass', "The teacher's observation language; extraction may not smooth it."],
+  ['Gate 4 — Exclusion Filtering', 'Pass', 'Teacher-mediated; over-capture is minimal.'],
+  ['Gate 5 — Attribution', 'Pass', 'Sightings attach to learners the teacher names.'],
+  ['Gate 6 — Retention Shape', 'Pass', 'The recording is the trace; standard retention.'],
+  ['Gate 7 — Cost Declaration', 'Pass', 'T3 against the teacher\u2019s declared budget.'],
+  ['Gate 8 — Dignity and Abuse Review', 'Pass', 'No surveillance surface exists.'],
+];
+const GATE9 = {
+  hosted: {
+    walk: [
+      ['1. Declared Locus', 'FAIL', 'No locus is declared; the extractor is an unnamed third-party service.'],
+      ['2. Boundary Containment', 'FAIL', 'Per-learner sightings about named children would cross the institutional boundary.'],
+      ['3. In-Flight Transit Scope', '—', 'Not reached: the channel already fails at the locus.'],
+      ['4. Instrument Identity and Held Weights', 'FAIL', 'A hosted model can change silently, without warrant lineage.'],
+      ['5. Capability-Gap Posture', '—', 'The honest outcome here is refusal, recorded as a capability gap.'],
+      ['6. Technical Enforcement Evidence', '—', 'No telemetry could cure an undeclared locus.'],
+    ],
+    disposition: 'HELD — pending a declared and conforming processing locus. Extraction will not run. A channel is not benign because its microphone is.',
+    admitted: false,
+  },
+  local: {
+    walk: [
+      ['1. Declared Locus', 'Pass', 'This machine, operated by the demo user, named in the registration crumb.'],
+      ['2. Boundary Containment', 'Pass', 'Debrief, transcript, and sightings stay on this machine.'],
+      ['3. In-Flight Transit Scope', 'Pass', 'No transit: extraction is in-process; every buffer is local.'],
+      ['4. Instrument Identity and Held Weights', 'Pass', 'The extractor is pinned and named in every crumb (Meta model id, or LOCAL STUB).'],
+      ['5. Capability-Gap Posture', 'Pass', 'If this machine could not run it, the channel would be refused, not provisionally admitted.'],
+      ['6. Technical Enforcement Evidence', 'Outstanding', 'Simulated, not produced. This demo supplies specification, not telemetry.'],
+    ],
+    disposition: 'ADMITTED ON THE SPECIFICATION, with binding conditions — not admitted on evidence. A real channel is admitted only when condition 6 has actually been exercised.',
+    admitted: true,
+  },
+};
+
+// --- warrant crumbs (Warrants v0 minimal shape) ---
+const crumbs = [];
+let lastCrumb = null;
+function crumb(action, target, note, extra = {}) {
+  const c = {
+    version: 'v0',
+    warrant_id: 'w_' + [...crypto.getRandomValues(new Uint8Array(6))].map((b) => b.toString(16).padStart(2, '0')).join(''),
+    agent: 'ens-trivial-pass-demo-v1',
+    action,
+    target,
+    content_hash: 'sha256:' + [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('') + '…(demo)',
+    from: lastCrumb,
+    issued_at: new Date().toISOString(),
+    context: { note, ...extra },
+  };
+  crumbs.push(c);
+  lastCrumb = c.warrant_id;
+  renderTrail();
+  return c;
+}
+
+// --- deterministic LOCAL STUB extraction (not a model) ---
+function stubExtract(text) {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const sightings = [];
+  for (const raw of sentences) {
+    const s = raw.trim();
+    for (const l of LEARNERS) {
+      const first = l.name.split(' ')[0];
+      if (s.startsWith(first) || s.includes(' ' + first + ' ') || s.includes(first + ' ')) {
+        sightings.push({ learner: l.name, quote: s, observation: s, extractor: 'LOCAL STUB — not a model' });
+        break;
+      }
+    }
+  }
+  return sightings;
+}
+
+function claimFrom(sighting) {
+  const q = sighting.quote.toLowerCase();
+  let cls = 'Emerging Competence', conf = 0.6, statement = `Interprets: ${sighting.observation}`;
+  if (/explain|showed|taught|copied her|helped/.test(q)) { cls = 'Demonstrated Competence'; conf = 0.8; }
+  if (/unsure|looked|hesitat|asked three times|before she would|struggl/.test(q)) { cls = 'Emerging Competence'; conf = 0.55; statement = `Uncertainty visible; support may be the route: ${sighting.observation}`; }
+  return { class: cls, statement, confidence: conf };
+}
+
+// --- state + rendering ---
+let SIGHTINGS = [], CLAIMS = [], meta = { metaConfigured: false };
+const $ = (id) => document.getElementById(id);
+
+function renderGates() {
+  $('gates').innerHTML = GATES_1_8.map(([g, r, n]) =>
+    `<div class="gate"><strong>${g}</strong> <span class="pass">${r}</span><br><small>${n}</small></div>`).join('');
+  const locus = document.querySelector('input[name=locus]:checked').value;
+  const g9 = GATE9[locus];
+  $('gate9-walk').innerHTML = '<h3>Gate 9 — Processing Locus, walked</h3>' + g9.walk.map(([c, r, n]) =>
+    `<div class="gate"><strong>${c}</strong> <span class="${r === 'FAIL' ? 'fail' : r === 'Pass' ? 'pass' : 'warn'}">${r}</span><br><small>${n}</small></div>`).join('');
+  $('disposition').textContent = g9.disposition;
+  $('disposition').className = 'disposition ' + (g9.admitted ? 'ok' : 'held');
+  $('extract-btn').disabled = !g9.admitted;
+  $('extract-btn').textContent = g9.admitted ? 'Run extraction' : 'Extraction refused — channel held';
+}
+
+function decayed(claim) {
+  const days = Number($('age').value);
+  return Math.max(0.05, claim.confidence * Math.exp(-days / 90)).toFixed(2);
+}
+
+function renderTwin() {
+  $('twin').innerHTML = CLAIMS.length ? CLAIMS.map((c, i) => `
+    <article class="claim ${c.contested ? 'contested' : ''}">
+      <h4>${c.learner} — ${c.class}</h4>
+      <p>${c.statement}</p>
+      <p><small>Confidence at assertion: ${c.confidence} · decayed (read-time, ${$('age').value}d): <strong>${decayed(c)}</strong><br>
+      Sighting: “${c.quote}” · extractor: ${c.extractor}<br>
+      ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
+      <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
+    </article>`).join('') : '<p><em>No claims yet. Admit the channel (Gate 9, local locus) and run extraction.</em></p>';
+  document.querySelectorAll('[data-contest]').forEach((b) => b.addEventListener('click', () => {
+    const c = CLAIMS[Number(b.dataset.contest)];
+    c.contested = true;
+    crumb('ens.claim.contest', c.id, 'Traveler/teacher contests the claim; claim preserved and marked contested', { claim: c.id });
+    renderTwin();
+  }));
+}
+
+function renderTrail() {
+  $('trail').innerHTML = crumbs.map((c) =>
+    `<div class="crumb"><code>${c.warrant_id}</code> <strong>${c.action}</strong> → ${c.target}<br><small>from: ${c.from || 'null (root)'} · ${c.issued_at}<br>${c.context.note || ''}</small></div>`).join('');
+}
+
+async function runExtraction() {
+  const locus = document.querySelector('input[name=locus]:checked').value;
+  const reg = crumb('ens.channel.register', 'channel:post-class-debrief',
+    locus === 'local' ? 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding' : 'Channel HELD at Gate 9',
+    { locus, gate9: locus === 'local' ? 'admitted-on-specification' : 'held' });
+  if (locus !== 'local') { renderTwin(); return; }
+  const text = $('debrief').value;
+  let sightings, extractorLabel;
+  if (meta.metaConfigured) {
+    try {
+      const res = await fetch('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name) }) });
+      if (!res.ok) throw new Error('api');
+      sightings = (await res.json()).sightings;
+      extractorLabel = `Meta model via API (${meta.model})`;
+    } catch { sightings = stubExtract(text); extractorLabel = 'LOCAL STUB — not a model (Meta API call failed; fallback)'; }
+  } else {
+    sightings = stubExtract(text);
+    extractorLabel = 'LOCAL STUB — not a model';
+  }
+  crumb('ens.evidence.extract', 'debrief:demo', `Extraction ran at the declared local locus; ${sightings.length} sighting(s)`, { extractor: extractorLabel, parent: reg.warrant_id });
+  SIGHTINGS = sightings;
+  CLAIMS = sightings.map((s, i) => {
+    const cl = claimFrom(s);
+    const id = 'claim_' + (i + 1);
+    const cc = crumb('ens.claim.assert', id, `${cl.class} asserted from sighting evidence; confidence ${cl.confidence}`, { learner: s.learner });
+    return { id, learner: s.learner, quote: s.quote, extractor: s.extractor || extractorLabel, contested: false, ...cl, crumb: cc.warrant_id };
+  });
+  $('extractor-note').textContent = `Extractor used: ${extractorLabel}. Sightings quote the debrief verbatim; claims interpret them and stay contestable.`;
+  renderTwin();
+}
+
+// --- init ---
+$('learners').textContent = LEARNERS.map((l) => l.name).join(', ');
+$('debrief').value = SAMPLE;
+document.querySelectorAll('input[name=locus]').forEach((r) => r.addEventListener('change', renderGates));
+$('extract-btn').addEventListener('click', runExtraction);
+$('age').addEventListener('input', () => { $('age-val').textContent = $('age').value; renderTwin(); });
+$('export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(crumbs, null, 2)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'trail-export.json' });
+  a.click();
+});
+fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}). Extraction can call the model at the declared locus.` : 'Meta API not configured. Extraction uses the deterministic LOCAL STUB — not a model.'; }).catch(() => {});
+crumb('ens.session.open', 'demo', 'Synthetic demo session opened; all learners are synthetic personas');
+renderGates();
+renderTwin();

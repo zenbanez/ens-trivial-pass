@@ -1,0 +1,13 @@
+{
+  "name": "ens-trivial-pass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Trivial Pass, Made Real — a synthetic-only slice of the Educational Navigation System (ENS) for the Meta AI Developer Hackathon.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Trivial Pass, Made Real — ENS Slice</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>The Trivial Pass, Made Real</h1>
+  <p class="sub">A synthetic-only slice of the <strong>Educational Navigation System (ENS)</strong> — ENSP001 §9's post-class debrief, passed through the Nine Gates.</p>
+  <p class="banner">ALL LEARNERS ARE SYNTHETIC. No real educational data is used, stored, or sent anywhere by this demo.</p>
+</header>
+
+<main>
+  <section id="debrief-panel">
+    <h2>1 · The teacher's debrief</h2>
+    <p>Synthetic class: <span id="learners"></span>. Edit the debrief, or use the sample.</p>
+    <textarea id="debrief" rows="7"></textarea>
+  </section>
+
+  <section id="gate-panel">
+    <h2>2 · The Nine Gates — channel admission</h2>
+    <p>The channel is <em>post-class narrative debrief → per-learner sightings</em>. Gates 1–8 pass in minutes. Gate 9 asks where extraction runs.</p>
+    <div id="gates"></div>
+    <fieldset>
+      <legend>Gate 9 — Processing Locus: where does extraction run?</legend>
+      <label><input type="radio" name="locus" value="hosted" checked> Hosted API (a third-party service extracts the sightings)</label>
+      <label><input type="radio" name="locus" value="local"> Declared local locus (this machine, named operator, pinned extractor)</label>
+    </fieldset>
+    <div id="gate9-walk"></div>
+    <p id="disposition" class="disposition"></p>
+    <button id="extract-btn">Run extraction</button>
+    <p class="note" id="extractor-note"></p>
+  </section>
+
+  <section id="twin-panel">
+    <h2>3 · Sightings → claims → the Twin</h2>
+    <p>Evidence and interpretation stay separate. A <strong>sighting</strong> quotes the debrief. A <strong>claim</strong> interprets sightings — and can be contested, never deleted. Confidence decays at read time; drag the slider to see it.</p>
+    <label>Days since assertion: <input type="range" id="age" min="0" max="180" value="0"> <span id="age-val">0</span></label>
+    <div id="twin"></div>
+  </section>
+
+  <section id="trail-panel">
+    <h2>4 · The warrant trail</h2>
+    <p>Every consequential act leaves a crumb (Warrants v0 shape, <code>ens.*</code> namespace). Walk it: each claim traces to its sighting, its extraction, and the gate decision that allowed it.</p>
+    <div id="trail"></div>
+    <button id="export-btn">Download trail (JSON)</button>
+  </section>
+</main>
+
+<footer>
+  <p>Candidate specifications demonstrated: ENS-0001, ENS-0002, ENS007, ENS011, ENSP001 §§4, 7–9. ENS is research under governed validation (ZenOS INT-0042/WS-0042); nothing here is adopted doctrine, DepEd policy, or legal advice. Extraction: Meta model via API when configured, otherwise a deterministic <strong>LOCAL STUB — not a model</strong>.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
