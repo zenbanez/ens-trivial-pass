@@ -14,6 +14,10 @@ const PORT = process.env.PORT || 4173;
 const MODEL_API_KEY = process.env.MODEL_API_KEY || '';
 const MODEL_API_BASE_URL = (process.env.MODEL_API_BASE_URL || 'https://api.meta.ai/v1').replace(/\/$/, '');
 const MODEL_API_MODEL = process.env.MODEL_API_MODEL || 'muse-spark-1.3';
+// Operator authorization for the hosted-synthetic path. The server, not the
+// page, holds this: a client claiming admission is refused unless the
+// operator has expressly enabled hosted-synthetic on the server.
+const HOSTED_SYNTHETIC_AUTHORIZED = /^(1|true|yes|on)$/i.test(process.env.HOSTED_SYNTHETIC_AUTHORIZED || '');
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
@@ -41,7 +45,7 @@ const server = createServer(async (req, res) => {
   try {
     if (req.url === '/api/config') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ metaConfigured: Boolean(MODEL_API_KEY), model: MODEL_API_MODEL, baseUrl: MODEL_API_BASE_URL }));
+      res.end(JSON.stringify({ metaConfigured: Boolean(MODEL_API_KEY), model: MODEL_API_MODEL, baseUrl: MODEL_API_BASE_URL, hostedSyntheticAuthorized: HOSTED_SYNTHETIC_AUTHORIZED }));
       return;
     }
     if (req.url === '/api/extract' && req.method === 'POST') {
@@ -59,6 +63,11 @@ const server = createServer(async (req, res) => {
       if (!gate || gate.mode !== 'hosted-synthetic' || gate.admitted !== true || gate.syntheticOnly !== true) {
         res.writeHead(403, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'Gate 9: extraction refused. The model endpoint is reachable only on the expressly authorized hosted-synthetic path (synthetic data only).', gate: gate ?? null }));
+        return;
+      }
+      if (!HOSTED_SYNTHETIC_AUTHORIZED) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Gate 9: hosted-synthetic is not authorized on this server. The operator must set HOSTED_SYNTHETIC_AUTHORIZED=1 to enable it; a client claim of admission is not sufficient.' }));
         return;
       }
       if (!MODEL_API_KEY) {

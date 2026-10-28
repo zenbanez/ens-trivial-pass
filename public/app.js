@@ -268,7 +268,7 @@ $('export-btn').addEventListener('click', () => {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'trail-export.json' });
   a.click();
 });
-fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}). It is called ONLY on the expressly authorized hosted-synthetic path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus uses the deterministic LOCAL STUB — not a model; hosted-synthetic will refuse.'; }).catch(() => {});
+fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}); hosted-synthetic server authorization is ${c.hostedSyntheticAuthorized ? 'ON' : 'OFF (operator must set HOSTED_SYNTHETIC_AUTHORIZED=1)'}. The model is called ONLY on that authorized path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus uses the deterministic LOCAL STUB — not a model; hosted-synthetic will refuse.'; }).catch(() => {});
 (async () => {
   await crumb('ens.session.open', 'demo', 'Synthetic demo session opened; all learners are synthetic personas');
   renderGates();
