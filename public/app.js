@@ -226,9 +226,23 @@ async function runExtraction() {
   const text = $('debrief').value;
   let sightings, extractorLabel;
   if (locus === 'local') {
-    // Strictly local: the server and any hosted model are never contacted.
-    sightings = stubExtract(text);
-    extractorLabel = 'LOCAL STUB — not a model (declared local locus; this machine only)';
+    // Declared local locus: extraction runs on this machine via Ollama
+    // (server-side call to the local model server). No hosted API is ever
+    // contacted in this mode. If the local model is unavailable, the
+    // labelled stub carries the demo and the crumb says so.
+    try {
+      const res = await fetch('/api/local-extract', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name), gate: { mode: 'local', admitted: true } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+      sightings = data.sightings;
+      extractorLabel = `Ollama local model (${data.locus?.model || 'muse-glimmer'}) on this machine`;
+    } catch (e) {
+      sightings = stubExtract(text);
+      extractorLabel = `LOCAL STUB — not a model (local model unavailable: ${e.message}; stub carried this run, on this machine only)`;
+    }
   } else {
     // hosted-synthetic: the ONLY path that may call the model API. The server
     // enforces the gate decision; without a configured key it refuses and
@@ -255,7 +269,7 @@ async function runExtraction() {
   }
   const runNo = ++RUN_SEQ;
   await crumb('ens.evidence.extract', 'debrief:demo', locus === 'local'
-    ? `Extraction ran at the declared local locus (this machine, stub); ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`
+    ? `Extraction ran at the declared local locus (this machine; extractor: ${extractorLabel}); ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`
     : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`,
   { extractor: extractorLabel, locus, parent: reg.warrant_id, run: runNo, debrief_hash: 'sha256:' + (await sha256Hex(text)) });
   // Claims accumulate across runs (D-004 V4): earlier claims — signed and
