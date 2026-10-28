@@ -47,25 +47,39 @@ const GATE9 = {
 };
 
 // --- warrant crumbs (Warrants v0 minimal shape) ---
+// content_hash is a real SHA-256 over a canonical payload:
+//   JSON.stringify({action, target, context, from, issued_at}) with context
+//   keys sorted. Anyone holding the exported trail can recompute it.
 const crumbs = [];
 let lastCrumb = null;
-function crumb(action, target, note, extra = {}) {
+const randHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+const canonical = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v));
+async function crumb(action, target, note, extra = {}) {
+  const from = lastCrumb;
+  const issued_at = new Date().toISOString();
+  const context = { note, ...extra };
+  const content_hash = 'sha256:' + (await sha256Hex(canonical({ action, target, context, from, issued_at })));
   const c = {
     version: 'v0',
-    warrant_id: 'w_' + [...crypto.getRandomValues(new Uint8Array(6))].map((b) => b.toString(16).padStart(2, '0')).join(''),
+    warrant_id: 'w_' + randHex(6),
     agent: 'ens-trivial-pass-demo-v1',
     action,
     target,
-    content_hash: 'sha256:' + [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('') + '…(demo)',
-    from: lastCrumb,
-    issued_at: new Date().toISOString(),
-    context: { note, ...extra },
+    content_hash,
+    from,
+    issued_at,
+    context,
   };
   crumbs.push(c);
   lastCrumb = c.warrant_id;
   renderTrail();
   return c;
 }
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
 // --- deterministic LOCAL STUB extraction (not a model) ---
 function stubExtract(text) {
@@ -85,12 +99,24 @@ function stubExtract(text) {
 }
 
 // Quote verification in code, outside the extractor (stub or model alike):
-// a sighting counts only if its quote is verbatim in the debrief text.
+// a sighting counts only if (a) the learner is a known synthetic learner,
+// (b) the quote is nonempty, and (c) the quote is verbatim in the debrief.
+// Literal matches and whitespace-normalized matches are distinguished:
+// the match kind travels with the sighting and is shown in the Twin.
+const LEARNER_NAMES = new Set(LEARNERS.map((l) => l.name));
+let CLAIM_SEQ = 0;
+const RUN_ID = randHex(3);
 function verifyQuotes(sightings, text) {
   const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-  const source = norm(text);
+  const sourceNorm = norm(text);
   const ok = [], rejected = [];
-  for (const s of sightings) (source.includes(norm(s.quote)) ? ok : rejected).push(s);
+  for (const s of sightings || []) {
+    const quote = String(s?.quote || '');
+    if (!s || !LEARNER_NAMES.has(s.learner) || !norm(quote)) { rejected.push(s); continue; }
+    if (text.includes(quote.trim())) ok.push({ ...s, match: 'literal' });
+    else if (sourceNorm.includes(norm(quote))) ok.push({ ...s, match: 'normalized' });
+    else rejected.push(s);
+  }
   return { ok, rejected };
 }
 
@@ -127,10 +153,10 @@ function decayed(claim) {
 function claimCard(c, i) {
   return `
     <article class="claim ${c.contested ? 'contested' : ''}">
-      <h4>${c.learner} — ${c.class} <small>[${c.status}]</small></h4>
-      <p>${c.statement}</p>
+      <h4>${escapeHtml(c.learner)} — ${escapeHtml(c.class)} <small>[${escapeHtml(c.status)}]</small></h4>
+      <p>${escapeHtml(c.statement)}</p>
       <p><small>Confidence at assertion: ${c.confidence} · decayed (read-time, ${$('age').value}d): <strong>${decayed(c)}</strong><br>
-      Sighting: “${c.quote}” · extractor: ${c.extractor} · quote verified in code<br>
+      Sighting: “${escapeHtml(c.quote)}” · extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match)<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
       ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
@@ -144,28 +170,28 @@ function renderTwin() {
     (CLAIMS.length ? '' : '<p><em>No claims yet. Admit the channel (Gate 9, local locus) and run extraction.</em></p>') +
     (proposed.length ? `<h3>Proposed claims — awaiting teacher sign-off (admission is a stewardship act)</h3>` + proposed.map((c) => claimCard(c, CLAIMS.indexOf(c))).join('') : '') +
     (signed.length ? `<h3>The Twin — signed claims only</h3>` + signed.map((c) => claimCard(c, CLAIMS.indexOf(c))).join('') : '');
-  document.querySelectorAll('[data-contest]').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-contest]').forEach((b) => b.addEventListener('click', async () => {
     const c = CLAIMS[Number(b.dataset.contest)];
     c.contested = true;
-    crumb('ens.claim.contest', c.id, 'Teacher contests the claim; claim preserved and marked contested', { claim: c.id });
+    await crumb('ens.claim.contest', c.id, 'Teacher contests the claim; claim preserved and marked contested', { claim: c.id });
     renderTwin();
   }));
-  document.querySelectorAll('[data-signoff]').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-signoff]').forEach((b) => b.addEventListener('click', async () => {
     const c = CLAIMS[Number(b.dataset.signoff)];
     c.status = 'signed';
-    crumb('ens.claim.signoff', c.id, 'Teacher sign-off: claim admitted to the Twin by a human, not by the extractor', { claim: c.id });
+    await crumb('ens.claim.signoff', c.id, 'Teacher sign-off: claim admitted to the Twin by a human, not by the extractor', { claim: c.id });
     renderTwin();
   }));
 }
 
 function renderTrail() {
   $('trail').innerHTML = crumbs.map((c) =>
-    `<div class="crumb"><code>${c.warrant_id}</code> <strong>${c.action}</strong> → ${c.target}<br><small>from: ${c.from || 'null (root)'} · ${c.issued_at}<br>${c.context.note || ''}</small></div>`).join('');
+    `<div class="crumb"><code>${escapeHtml(c.warrant_id)}</code> <strong>${escapeHtml(c.action)}</strong> → ${escapeHtml(c.target)}<br><small>from: ${escapeHtml(c.from || 'null (root)')} · ${escapeHtml(c.issued_at)}<br>${escapeHtml(c.context.note || '')}</small></div>`).join('');
 }
 
 async function runExtraction() {
   const locus = document.querySelector('input[name=locus]:checked').value;
-  const reg = crumb('ens.channel.register', 'channel:post-class-debrief',
+  const reg = await crumb('ens.channel.register', 'channel:post-class-debrief',
     locus === 'local' ? 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding' : 'Channel HELD at Gate 9',
     { locus, gate9: locus === 'local' ? 'admitted-on-specification' : 'held' });
   if (locus !== 'local') { renderTwin(); return; }
@@ -184,16 +210,17 @@ async function runExtraction() {
   }
   const verified = verifyQuotes(sightings, text);
   if (verified.rejected.length) {
-    crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
+    await crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote empty, learner unknown, or quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
   }
-  crumb('ens.evidence.extract', 'debrief:demo', `Extraction ran at the declared local locus; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`, { extractor: extractorLabel, parent: reg.warrant_id });
+  await crumb('ens.evidence.extract', 'debrief:demo', `Extraction ran at the declared local locus; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`, { extractor: extractorLabel, parent: reg.warrant_id });
   SIGHTINGS = verified.ok;
-  CLAIMS = verified.ok.map((s, i) => {
+  CLAIMS = [];
+  for (const s of verified.ok) {
     const cl = claimFrom(s);
-    const id = 'claim_' + (i + 1);
-    const cc = crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, { learner: s.learner });
-    return { id, learner: s.learner, quote: s.quote, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, crumb: cc.warrant_id };
-  });
+    const id = `claim_${RUN_ID}_${++CLAIM_SEQ}`;
+    const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, { learner: s.learner, match: s.match });
+    CLAIMS.push({ id, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, crumb: cc.warrant_id });
+  }
   $('extractor-note').textContent = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code${verified.rejected.length ? `, ${verified.rejected.length} rejected` : ''}. Claims are proposed — a teacher signs them into the Twin.`;
   renderTwin();
 }
@@ -210,6 +237,8 @@ $('export-btn').addEventListener('click', () => {
   a.click();
 });
 fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}). Extraction can call the model at the declared locus.` : 'Meta API not configured. Extraction uses the deterministic LOCAL STUB — not a model.'; }).catch(() => {});
-crumb('ens.session.open', 'demo', 'Synthetic demo session opened; all learners are synthetic personas');
-renderGates();
-renderTwin();
+(async () => {
+  await crumb('ens.session.open', 'demo', 'Synthetic demo session opened; all learners are synthetic personas');
+  renderGates();
+  renderTwin();
+})();

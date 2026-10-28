@@ -46,20 +46,32 @@ const server = createServer(async (req, res) => {
     }
     if (req.url === '/api/extract' && req.method === 'POST') {
       let body = '';
-      for await (const chunk of req) body += chunk;
+      for await (const chunk of req) { body += chunk; if (body.length > 65536) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request too large' })); return; } }
       const { text, learners } = JSON.parse(body || '{}');
+      if (typeof text !== 'string' || text.length > 20000 || !Array.isArray(learners)) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'expected {text: string (<=20000 chars), learners: string[]}' }));
+        return;
+      }
       if (!MODEL_API_KEY) {
         res.writeHead(501, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'Meta API not configured; the client uses its labelled LOCAL STUB.' }));
         return;
       }
-      const raw = await extractWithMeta(String(text || ''), learners || []);
+      const raw = await extractWithMeta(text, learners);
       // Verification lives in code, outside the model (the workshop pattern):
-      // a sighting is accepted only if its quote is verbatim in the debrief.
+      // a sighting is accepted only if its learner is whitelisted, its quote
+      // is nonempty, and the quote is verbatim in the debrief.
       const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
       const source = norm(text);
+      const allowed = new Set(learners);
       const sightings = [], rejected = [];
-      for (const s of raw) (source.includes(norm(s.quote)) ? sightings : rejected).push(s);
+      for (const s of raw) {
+        if (!s || typeof s.quote !== 'string' || !norm(s.quote) || !allowed.has(s.learner)) { rejected.push(s); continue; }
+        if (text.includes(s.quote.trim())) sightings.push({ ...s, match: 'literal' });
+        else if (source.includes(norm(s.quote))) sightings.push({ ...s, match: 'normalized' });
+        else rejected.push(s);
+      }
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ sightings, rejected: rejected.length }));
       return;
