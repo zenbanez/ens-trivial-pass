@@ -44,6 +44,18 @@ const GATE9 = {
     disposition: 'ADMITTED ON THE SPECIFICATION, with binding conditions — not admitted on evidence. A real channel is admitted only when condition 6 has actually been exercised.',
     admitted: true,
   },
+  'hosted-synthetic': {
+    walk: [
+      ['1. Declared Locus', 'Pass — synthetic only', 'The registration names the Meta Model API endpoint and model, and its operator. Declared, not hidden.'],
+      ['2. Boundary Containment', 'Synthetic only', 'No learner content exists in this demo: every learner is a synthetic persona. With real learner content this condition FAILS and the channel is HELD.'],
+      ['3. In-Flight Transit Scope', 'Authorized', 'Synthetic debrief text crosses to the declared endpoint, expressly authorized by the operator for this demonstration.'],
+      ['4. Instrument Identity and Held Weights', 'Declared', 'The model id is named in every crumb. A hosted model can change under that id; for real data this condition requires held weights and would FAIL here.'],
+      ['5. Capability-Gap Posture', 'Not invoked', 'This path exists because the data is synthetic, not because local capability is absent.'],
+      ['6. Technical Enforcement Evidence', 'Outstanding', 'No telemetry is produced. Nothing here is evidence a real channel would be safe.'],
+    ],
+    disposition: 'ADMITTED FOR SYNTHETIC DATA ONLY — an expressly authorized demonstration path. This is NOT Gate 9 compliance: the same channel carrying a real debrief would be HELD at conditions 2 and 4.',
+    admitted: true,
+  },
 };
 
 // --- warrant crumbs (Warrants v0 minimal shape) ---
@@ -191,28 +203,48 @@ function renderTrail() {
 
 async function runExtraction() {
   const locus = document.querySelector('input[name=locus]:checked').value;
-  const reg = await crumb('ens.channel.register', 'channel:post-class-debrief',
-    locus === 'local' ? 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding' : 'Channel HELD at Gate 9',
-    { locus, gate9: locus === 'local' ? 'admitted-on-specification' : 'held' });
-  if (locus !== 'local') { renderTwin(); return; }
+  const regNote = {
+    hosted: 'Channel HELD at Gate 9: undeclared hosted locus; extraction refused',
+    local: 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding; extraction strictly local (no model API call)',
+    'hosted-synthetic': 'Channel admitted FOR SYNTHETIC DATA ONLY under expressly authorized hosted path; NOT Gate 9 compliance for real learner data',
+  }[locus];
+  const reg = await crumb('ens.channel.register', 'channel:post-class-debrief', regNote,
+    { locus, gate9: locus === 'hosted' ? 'held' : locus === 'local' ? 'admitted-on-specification' : 'admitted-synthetic-only', synthetic_only: locus === 'hosted-synthetic' });
+  if (locus === 'hosted') { renderTwin(); return; }
   const text = $('debrief').value;
   let sightings, extractorLabel;
-  if (meta.metaConfigured) {
-    try {
-      const res = await fetch('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name) }) });
-      if (!res.ok) throw new Error('api');
-      sightings = (await res.json()).sightings;
-      extractorLabel = `Meta model via API (${meta.model})`;
-    } catch { sightings = stubExtract(text); extractorLabel = 'LOCAL STUB — not a model (Meta API call failed; fallback)'; }
-  } else {
+  if (locus === 'local') {
+    // Strictly local: the server and any hosted model are never contacted.
     sightings = stubExtract(text);
-    extractorLabel = 'LOCAL STUB — not a model';
+    extractorLabel = 'LOCAL STUB — not a model (declared local locus; this machine only)';
+  } else {
+    // hosted-synthetic: the ONLY path that may call the model API. The server
+    // enforces the gate decision; without a configured key it refuses and
+    // there is deliberately no silent fallback to the stub in this mode.
+    try {
+      const res = await fetch('/api/extract', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name), gate: { mode: 'hosted-synthetic', admitted: true, syntheticOnly: true } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+      sightings = data.sightings;
+      extractorLabel = `Meta model via API (${data.locus?.model || meta.model}) at ${data.locus?.endpoint || 'declared endpoint'} — synthetic data sent, expressly authorized`;
+    } catch (e) {
+      await crumb('ens.evidence.reject', 'debrief:demo', `Hosted-synthetic extraction refused/failed: ${e.message}. No fallback applied in this mode.`, { locus });
+      $('extractor-note').textContent = `Hosted-synthetic extraction did not run: ${e.message}. Configure MODEL_API_KEY on the server, or use the declared local locus.`;
+      renderTwin();
+      return;
+    }
   }
   const verified = verifyQuotes(sightings, text);
   if (verified.rejected.length) {
     await crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote empty, learner unknown, or quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
   }
-  await crumb('ens.evidence.extract', 'debrief:demo', `Extraction ran at the declared local locus; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`, { extractor: extractorLabel, parent: reg.warrant_id });
+  await crumb('ens.evidence.extract', 'debrief:demo', locus === 'local'
+    ? `Extraction ran at the declared local locus (this machine, stub); ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`
+    : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`,
+  { extractor: extractorLabel, locus, parent: reg.warrant_id });
   SIGHTINGS = verified.ok;
   CLAIMS = [];
   for (const s of verified.ok) {
@@ -236,7 +268,7 @@ $('export-btn').addEventListener('click', () => {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'trail-export.json' });
   a.click();
 });
-fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}). Extraction can call the model at the declared locus.` : 'Meta API not configured. Extraction uses the deterministic LOCAL STUB — not a model.'; }).catch(() => {});
+fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}). It is called ONLY on the expressly authorized hosted-synthetic path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus uses the deterministic LOCAL STUB — not a model; hosted-synthetic will refuse.'; }).catch(() => {});
 (async () => {
   await crumb('ens.session.open', 'demo', 'Synthetic demo session opened; all learners are synthetic personas');
   renderGates();

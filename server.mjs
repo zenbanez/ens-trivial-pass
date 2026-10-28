@@ -47,10 +47,18 @@ const server = createServer(async (req, res) => {
     if (req.url === '/api/extract' && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) { body += chunk; if (body.length > 65536) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request too large' })); return; } }
-      const { text, learners } = JSON.parse(body || '{}');
+      const { text, learners, gate } = JSON.parse(body || '{}');
       if (typeof text !== 'string' || text.length > 20000 || !Array.isArray(learners)) {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'expected {text: string (<=20000 chars), learners: string[]}' }));
+        return;
+      }
+      // The server enforces the gate, not just the page (D-004 V2): the model
+      // is reachable only on the expressly authorized hosted-synthetic path.
+      // Every other gate decision — held, local, or absent — is refused here.
+      if (!gate || gate.mode !== 'hosted-synthetic' || gate.admitted !== true || gate.syntheticOnly !== true) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Gate 9: extraction refused. The model endpoint is reachable only on the expressly authorized hosted-synthetic path (synthetic data only).', gate: gate ?? null }));
         return;
       }
       if (!MODEL_API_KEY) {
@@ -73,7 +81,7 @@ const server = createServer(async (req, res) => {
         else rejected.push(s);
       }
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ sightings, rejected: rejected.length }));
+      res.end(JSON.stringify({ sightings, rejected: rejected.length, locus: { mode: 'hosted-synthetic', endpoint: MODEL_API_BASE_URL, model: MODEL_API_MODEL, syntheticOnly: true } }));
       return;
     }
     const path = normalize(join(root, req.url === '/' ? 'index.html' : req.url.split('?')[0]));
