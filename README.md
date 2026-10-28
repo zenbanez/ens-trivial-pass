@@ -5,6 +5,9 @@ for the **Meta AI Developer Hackathon** (submissions due 4 November 2026).
 
 ENS is a governed research corpus (ZenOS INT-0042 / WS-0042) that asks what
 an educational system must *refuse* to become before it asks what to build.
+**Previous-work disclosure:** the ENS specifications predate this hackathon;
+the implementation in this repository was built during it. The full
+boundary is in [DISCLOSURE.md](DISCLOSURE.md).
 This demo implements one worked case from that corpus — ENSP001 §9, the
 post-class debrief — because it is the case the corpus itself calls trivial,
 right up until the ninth gate.
