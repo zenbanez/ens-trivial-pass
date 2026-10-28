@@ -1,0 +1,13 @@
+The Trivial Pass, Made Real
+Copyright 2026 Zen Bañez
+
+This product includes a demonstration derived from the Educational
+Navigation System (ENS) candidate corpus, previous work by Zen Bañez
+in dialogue with AI assistants, held under governed validation in the
+ZenOS repository (INT-0042 / WS-0042). The corpus itself is not included
+in this distribution and is not licensed here; see DISCLOSURE.md.
+
+Design pattern (verification in code, quote-checked facts, human
+sign-off) follows Meta's legal-agent-workshop (Agents 101), credited
+in DISCLOSURE.md. No third-party code is vendored: server and client
+are dependency-free.

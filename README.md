@@ -3,6 +3,11 @@
 A synthetic-only slice of the **Educational Navigation System (ENS)**, built
 for the **Meta AI Developer Hackathon** (submissions due 4 November 2026).
 
+**Track:** Indie. **Team:** one human — Zen Bañez, steward, director, and
+accountable submitter — and several AI agent collaborators (see
+[DISCLOSURE.md](DISCLOSURE.md) for who did what, and what predates the
+hackathon). **License:** Apache 2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)).
+
 ENS is a governed research corpus (ZenOS INT-0042 / WS-0042) that asks what
 an educational system must *refuse* to become before it asks what to build.
 **Previous-work disclosure:** the ENS specifications predate this hackathon;
