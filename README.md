@@ -46,14 +46,27 @@ Extraction is one function. With credentials supplied **via environment
 only** (never committed):
 
 ```bash
-META_API_KEY=... META_API_BASE_URL=... META_MODEL=... node server.mjs
+MODEL_API_KEY=... node server.mjs
+# optional: MODEL_API_BASE_URL (default https://api.meta.ai/v1),
+#           MODEL_API_MODEL  (default muse-spark-1.3)
 ```
 
-it calls a Meta Muse model for sighting extraction with a strict JSON
-prompt. Without them, a deterministic **LOCAL STUB — not a model** (labelled
-as such in the UI and in every crumb) keeps the demo fully judgeable
-offline. The Gate 9 held disposition fires *before* any hosted call would
-be made.
+it calls a Meta Muse model for sighting extraction via the Responses API
+(the `meta-models/legal-agent-workshop` convention: OpenAI-compatible
+client pointed at `api.meta.ai`). Without a key, a deterministic
+**LOCAL STUB — not a model** (labelled as such in the UI and in every
+crumb) keeps the demo fully judgeable offline. The Gate 9 held disposition
+fires *before* any hosted call would be made.
+
+Two trust patterns are borrowed from that workshop and kept in code,
+outside the model:
+
+- **Quote-checked sightings.** The extractor proposes; code verifies every
+  quote is a verbatim substring of the debrief before it counts.
+  Unverifiable sightings are rejected with a crumb, never silently fixed.
+- **Teacher sign-off.** Claims are born *proposed*. Only a human click —
+  recorded as an `ens.claim.signoff` crumb — admits a claim to the Twin.
+  Admission is a stewardship act (ENSP001 §5), not a model output.
 
 ## Data discipline
 

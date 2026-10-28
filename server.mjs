@@ -9,9 +9,11 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('./public', import.meta.url));
 const PORT = process.env.PORT || 4173;
-const META_API_KEY = process.env.META_API_KEY || '';
-const META_API_BASE_URL = (process.env.META_API_BASE_URL || '').replace(/\/$/, '');
-const META_MODEL = process.env.META_MODEL || '';
+// Meta Model API, per the meta-models/legal-agent-workshop convention:
+// OpenAI-compatible client pointed at api.meta.ai, key from environment only.
+const MODEL_API_KEY = process.env.MODEL_API_KEY || '';
+const MODEL_API_BASE_URL = (process.env.MODEL_API_BASE_URL || 'https://api.meta.ai/v1').replace(/\/$/, '');
+const MODEL_API_MODEL = process.env.MODEL_API_MODEL || 'muse-spark-1.3';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
@@ -22,41 +24,44 @@ async function extractWithMeta(text, learners) {
     'Use only these learner names:', learners.join(', '),
     'Debrief:', text,
   ].join('\n');
-  const res = await fetch(`${META_API_BASE_URL}/chat/completions`, {
+  // Responses API (client.responses.create in the workshop's Python kit).
+  const res = await fetch(`${MODEL_API_BASE_URL}/responses`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${META_API_KEY}` },
-    body: JSON.stringify({
-      model: META_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-    }),
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${MODEL_API_KEY}` },
+    body: JSON.stringify({ model: MODEL_API_MODEL, input: prompt, temperature: 0 }),
   });
   if (!res.ok) throw new Error(`Meta API ${res.status}`);
   const data = await res.json();
-  const content = data.choices?.[0]?.message?.content || '{}';
+  const content = data.output_text || data.output?.flatMap((o) => o.content || []).find((c) => c.type === 'output_text')?.text || '{}';
   const parsed = JSON.parse(content.replace(/^```json?|```$/gm, '').trim());
-  return (parsed.sightings || []).map((s) => ({ ...s, extractor: `meta:${META_MODEL}` }));
+  return (parsed.sightings || []).map((s) => ({ ...s, extractor: `meta:${MODEL_API_MODEL}` }));
 }
 
 const server = createServer(async (req, res) => {
   try {
     if (req.url === '/api/config') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ metaConfigured: Boolean(META_API_KEY && META_API_BASE_URL && META_MODEL), model: META_MODEL || null }));
+      res.end(JSON.stringify({ metaConfigured: Boolean(MODEL_API_KEY), model: MODEL_API_MODEL, baseUrl: MODEL_API_BASE_URL }));
       return;
     }
     if (req.url === '/api/extract' && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) body += chunk;
       const { text, learners } = JSON.parse(body || '{}');
-      if (!META_API_KEY || !META_API_BASE_URL || !META_MODEL) {
+      if (!MODEL_API_KEY) {
         res.writeHead(501, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'Meta API not configured; the client uses its labelled LOCAL STUB.' }));
         return;
       }
-      const sightings = await extractWithMeta(String(text || ''), learners || []);
+      const raw = await extractWithMeta(String(text || ''), learners || []);
+      // Verification lives in code, outside the model (the workshop pattern):
+      // a sighting is accepted only if its quote is verbatim in the debrief.
+      const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+      const source = norm(text);
+      const sightings = [], rejected = [];
+      for (const s of raw) (source.includes(norm(s.quote)) ? sightings : rejected).push(s);
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ sightings }));
+      res.end(JSON.stringify({ sightings, rejected: rejected.length }));
       return;
     }
     const path = normalize(join(root, req.url === '/' ? 'index.html' : req.url.split('?')[0]));
@@ -71,5 +76,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`ENS Trivial Pass demo at http://127.0.0.1:${PORT} (Meta API ${META_API_KEY ? 'configured' : 'not configured — LOCAL STUB extraction'})`);
+  console.log(`ENS Trivial Pass demo at http://127.0.0.1:${PORT} (Meta API ${MODEL_API_KEY ? `configured: ${MODEL_API_MODEL} @ ${MODEL_API_BASE_URL}` : 'not configured — LOCAL STUB extraction'})`);
 });

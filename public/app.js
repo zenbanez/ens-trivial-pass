@@ -84,6 +84,16 @@ function stubExtract(text) {
   return sightings;
 }
 
+// Quote verification in code, outside the extractor (stub or model alike):
+// a sighting counts only if its quote is verbatim in the debrief text.
+function verifyQuotes(sightings, text) {
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const source = norm(text);
+  const ok = [], rejected = [];
+  for (const s of sightings) (source.includes(norm(s.quote)) ? ok : rejected).push(s);
+  return { ok, rejected };
+}
+
 function claimFrom(sighting) {
   const q = sighting.quote.toLowerCase();
   let cls = 'Emerging Competence', conf = 0.6, statement = `Interprets: ${sighting.observation}`;
@@ -114,20 +124,36 @@ function decayed(claim) {
   return Math.max(0.05, claim.confidence * Math.exp(-days / 90)).toFixed(2);
 }
 
-function renderTwin() {
-  $('twin').innerHTML = CLAIMS.length ? CLAIMS.map((c, i) => `
+function claimCard(c, i) {
+  return `
     <article class="claim ${c.contested ? 'contested' : ''}">
-      <h4>${c.learner} — ${c.class}</h4>
+      <h4>${c.learner} — ${c.class} <small>[${c.status}]</small></h4>
       <p>${c.statement}</p>
       <p><small>Confidence at assertion: ${c.confidence} · decayed (read-time, ${$('age').value}d): <strong>${decayed(c)}</strong><br>
-      Sighting: “${c.quote}” · extractor: ${c.extractor}<br>
+      Sighting: “${c.quote}” · extractor: ${c.extractor} · quote verified in code<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
+      ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
-    </article>`).join('') : '<p><em>No claims yet. Admit the channel (Gate 9, local locus) and run extraction.</em></p>';
+    </article>`;
+}
+
+function renderTwin() {
+  const proposed = CLAIMS.filter((c) => c.status === 'proposed');
+  const signed = CLAIMS.filter((c) => c.status === 'signed');
+  $('twin').innerHTML =
+    (CLAIMS.length ? '' : '<p><em>No claims yet. Admit the channel (Gate 9, local locus) and run extraction.</em></p>') +
+    (proposed.length ? `<h3>Proposed claims — awaiting teacher sign-off (admission is a stewardship act)</h3>` + proposed.map((c) => claimCard(c, CLAIMS.indexOf(c))).join('') : '') +
+    (signed.length ? `<h3>The Twin — signed claims only</h3>` + signed.map((c) => claimCard(c, CLAIMS.indexOf(c))).join('') : '');
   document.querySelectorAll('[data-contest]').forEach((b) => b.addEventListener('click', () => {
     const c = CLAIMS[Number(b.dataset.contest)];
     c.contested = true;
-    crumb('ens.claim.contest', c.id, 'Traveler/teacher contests the claim; claim preserved and marked contested', { claim: c.id });
+    crumb('ens.claim.contest', c.id, 'Teacher contests the claim; claim preserved and marked contested', { claim: c.id });
+    renderTwin();
+  }));
+  document.querySelectorAll('[data-signoff]').forEach((b) => b.addEventListener('click', () => {
+    const c = CLAIMS[Number(b.dataset.signoff)];
+    c.status = 'signed';
+    crumb('ens.claim.signoff', c.id, 'Teacher sign-off: claim admitted to the Twin by a human, not by the extractor', { claim: c.id });
     renderTwin();
   }));
 }
@@ -156,15 +182,19 @@ async function runExtraction() {
     sightings = stubExtract(text);
     extractorLabel = 'LOCAL STUB — not a model';
   }
-  crumb('ens.evidence.extract', 'debrief:demo', `Extraction ran at the declared local locus; ${sightings.length} sighting(s)`, { extractor: extractorLabel, parent: reg.warrant_id });
-  SIGHTINGS = sightings;
-  CLAIMS = sightings.map((s, i) => {
+  const verified = verifyQuotes(sightings, text);
+  if (verified.rejected.length) {
+    crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
+  }
+  crumb('ens.evidence.extract', 'debrief:demo', `Extraction ran at the declared local locus; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`, { extractor: extractorLabel, parent: reg.warrant_id });
+  SIGHTINGS = verified.ok;
+  CLAIMS = verified.ok.map((s, i) => {
     const cl = claimFrom(s);
     const id = 'claim_' + (i + 1);
-    const cc = crumb('ens.claim.assert', id, `${cl.class} asserted from sighting evidence; confidence ${cl.confidence}`, { learner: s.learner });
-    return { id, learner: s.learner, quote: s.quote, extractor: s.extractor || extractorLabel, contested: false, ...cl, crumb: cc.warrant_id };
+    const cc = crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, { learner: s.learner });
+    return { id, learner: s.learner, quote: s.quote, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, crumb: cc.warrant_id };
   });
-  $('extractor-note').textContent = `Extractor used: ${extractorLabel}. Sightings quote the debrief verbatim; claims interpret them and stay contestable.`;
+  $('extractor-note').textContent = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code${verified.rejected.length ? `, ${verified.rejected.length} rejected` : ''}. Claims are proposed — a teacher signs them into the Twin.`;
   renderTwin();
 }
 
