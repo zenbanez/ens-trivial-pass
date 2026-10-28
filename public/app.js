@@ -169,12 +169,15 @@ function decayed(claim) {
 }
 
 function claimCard(c, i) {
+  const d = Number(decayed(c));
   return `
-    <article class="claim ${c.contested ? 'contested' : ''}">
+    <article class="claim ${c.contested ? 'contested' : ''}" data-claim-card="${escapeHtml(c.id)}" title="Select to highlight this claim's crumb chain">
       <h4>${escapeHtml(c.learner)} — ${escapeHtml(c.class)} <small>[${escapeHtml(c.status)} · run ${c.run ?? 1}]</small></h4>
       <p>${escapeHtml(c.statement)}</p>
-      <p><small>Confidence at assertion: ${c.confidence} · decayed (read-time, ${$('age').value}d): <strong>${decayed(c)}</strong><br>
-      Sighting: “${escapeHtml(c.quote)}” · extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match)<br>
+      <div class="meter"><i style="width:${Math.round(d * 100)}%"></i></div>
+      <p><small>Confidence ${c.confidence} at assertion → <strong>${d.toFixed(2)}</strong> after ${$('age').value} days (computed at read time — drag the slider)</small></p>
+      <blockquote>“${escapeHtml(c.quote)}”</blockquote>
+      <p><small>Extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match)<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
       ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
@@ -188,6 +191,10 @@ function renderTwin() {
     (CLAIMS.length ? '' : '<p><em>No claims yet. Admit the channel (Gate 9, local locus) and run extraction.</em></p>') +
     (proposed.length ? `<h3>Proposed claims — awaiting teacher sign-off (admission is a stewardship act)</h3>` + proposed.map((c) => claimCard(c, CLAIMS.indexOf(c))).join('') : '') +
     (signed.length ? `<h3>The Twin — signed claims only</h3>` + signed.map((c) => claimCard(c, CLAIMS.indexOf(c))).join('') : '');
+  document.querySelectorAll('[data-claim-card]').forEach((card) => card.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    highlightChain(CLAIMS.find((c) => c.id === card.dataset.claimCard));
+  }));
   document.querySelectorAll('[data-contest]').forEach((b) => b.addEventListener('click', async () => {
     const c = CLAIMS[Number(b.dataset.contest)];
     c.contested = true;
@@ -210,7 +217,22 @@ function renderTwin() {
 
 function renderTrail() {
   $('trail').innerHTML = crumbs.map((c) =>
-    `<div class="crumb"><code>${escapeHtml(c.warrant_id)}</code> <strong>${escapeHtml(c.action)}</strong> → ${escapeHtml(c.target)}<br><small>from: ${escapeHtml(c.from || 'null (root)')} · ${escapeHtml(c.issued_at)}<br>${escapeHtml(c.context.note || '')}</small></div>`).join('');
+    `<div class="crumb" data-crumb-id="${escapeHtml(c.warrant_id)}" data-crumb-claim="${escapeHtml(c.context.claim || '')}"><code>${escapeHtml(c.warrant_id)}</code> <strong>${escapeHtml(c.action)}</strong> → ${escapeHtml(c.target)}<br><small>from: ${escapeHtml(c.from || 'null (root)')} · ${escapeHtml(c.issued_at)}<br>${escapeHtml(c.context.note || '')}</small></div>`).join('');
+}
+
+// Selecting a claim highlights its crumb chain: the asserting crumb plus
+// every later crumb that names the claim (sign-off, contest).
+function highlightChain(claim) {
+  document.querySelectorAll('.crumb.highlight, .claim.highlight').forEach((el) => el.classList.remove('highlight'));
+  if (!claim) return;
+  const ids = new Set([claim.crumb]);
+  crumbs.forEach((c) => { if (c.context.claim === claim.id) ids.add(c.warrant_id); });
+  let first = null;
+  document.querySelectorAll('[data-crumb-id]').forEach((el) => {
+    if (ids.has(el.dataset.crumbId)) { el.classList.add('highlight'); first = first || el; }
+  });
+  document.querySelector(`[data-claim-card="${CSS.escape(claim.id)}"]`)?.classList.add('highlight');
+  first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function runExtraction() {

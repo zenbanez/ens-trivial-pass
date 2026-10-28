@@ -1,20 +1,128 @@
-:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-body { margin: 0 auto; max-width: 920px; padding: 1.5rem 1rem 3rem; line-height: 1.5; }
-header h1 { margin-bottom: .2rem; }
-.sub { opacity: .85; }
-.banner { background: #7c2d12; color: #fff; padding: .6rem .9rem; border-radius: .5rem; font-weight: 600; }
-section { border: 1px solid #8884; border-radius: .7rem; padding: 1rem 1.2rem; margin: 1.2rem 0; }
-textarea { width: 100%; font: inherit; padding: .6rem; border-radius: .4rem; }
-.gate { padding: .45rem 0; border-bottom: 1px dashed #8883; }
-.pass { color: #15803d; font-weight: 700; } .fail { color: #dc2626; font-weight: 700; } .warn { color: #d97706; font-weight: 700; }
-.disposition { font-weight: 700; padding: .7rem .9rem; border-radius: .5rem; }
-.disposition.held { background: #7f1d1d; color: #fff; }
-.disposition.ok { background: #14532d; color: #fff; }
-fieldset label { display: block; margin: .35rem 0; }
-button { font: inherit; padding: .55rem 1rem; border-radius: .5rem; cursor: pointer; }
-button:disabled { opacity: .5; cursor: not-allowed; }
-.claim { border: 1px solid #8884; border-radius: .6rem; padding: .8rem 1rem; margin: .7rem 0; }
-.claim.contested { border-color: #dc2626; }
-.crumb { font-size: .9rem; padding: .5rem 0; border-bottom: 1px dashed #8883; }
-.note { font-size: .92rem; opacity: .85; }
-footer { font-size: .88rem; opacity: .8; margin-top: 2rem; }
+/* The Trivial Pass, Made Real — a calm, editorial UI.
+   Paper and ink; one dramatic color (held rust), one settled color
+   (admitted green), amber only for the synthetic warning. No framework. */
+
+:root {
+  --paper: #faf7f1;
+  --ink: #1c2430;
+  --ink-soft: #4a5568;
+  --line: #ddd3c3;
+  --card: #fffdf8;
+  --held: #9c2b1b;
+  --held-bg: #7c2113;
+  --ok: #1e6b45;
+  --ok-bg: #17452e;
+  --amber: #8a5a00;
+  --amber-bg: #fdf3d7;
+  --accent: #24507a;
+  --radius: 14px;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0 auto; max-width: 980px; padding: 2.5rem 1.25rem 4rem;
+  background: var(--paper); color: var(--ink); line-height: 1.6;
+  font-size: 17px;
+}
+header { text-align: left; border-bottom: 3px double var(--line); padding-bottom: 1.2rem; margin-bottom: .5rem; }
+header h1 { font-size: 2.4rem; line-height: 1.12; margin: 0 0 .4rem; letter-spacing: -.01em; font-weight: 600; }
+.sub { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 1rem; }
+.sub strong { color: var(--ink); }
+.banner {
+  display: inline-block; background: var(--amber-bg); color: var(--amber);
+  border: 1px solid #e5cf8f; padding: .45rem .8rem; border-radius: 999px;
+  font-family: ui-sans-system, system-ui, sans-serif; font-size: .78rem; font-weight: 700; letter-spacing: .06em;
+}
+nav.steps {
+  display: flex; gap: .5rem; flex-wrap: wrap; margin: 1.4rem 0 .4rem;
+  font-family: ui-sans-system, system-ui, sans-serif; font-size: .85rem;
+}
+nav.steps a {
+  color: var(--ink-soft); text-decoration: none; border: 1px solid var(--line);
+  background: var(--card); padding: .35rem .75rem; border-radius: 999px;
+}
+nav.steps a b { color: var(--accent); margin-right: .35rem; }
+section {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 1.5rem 1.7rem; margin: 1.4rem 0; box-shadow: 0 1px 3px rgba(28,36,48,.05);
+}
+section h2 { margin: 0 0 .6rem; font-size: 1.45rem; font-weight: 600; }
+section h3 { margin: 1.4rem 0 .5rem; font-size: 1.08rem; }
+p { margin: .5rem 0; }
+.note, small { color: var(--ink-soft); }
+textarea {
+  width: 100%; font: inherit; font-size: .98rem; padding: .9rem 1rem;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  color: var(--ink); resize: vertical;
+}
+textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+#gates, #gate9-walk { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.6rem; }
+@media (max-width: 720px) { #gates, #gate9-walk { grid-template-columns: 1fr; } }
+.gate { padding: .55rem 0; border-bottom: 1px solid #eee5d3; font-size: .96rem; }
+.gate strong { font-family: ui-sans-system, system-ui, sans-serif; font-size: .9rem; }
+.pass, .fail, .warn {
+  font-family: ui-sans-system, system-ui, sans-serif; font-size: .72rem; font-weight: 800;
+  letter-spacing: .05em; padding: .12rem .5rem; border-radius: 999px; white-space: nowrap;
+}
+.pass { background: #e3efe6; color: var(--ok); }
+.fail { background: #fbe9e4; color: var(--held); }
+.warn { background: var(--amber-bg); color: var(--amber); }
+
+fieldset { border: 0; padding: 0; margin: 1.2rem 0; display: grid; gap: .6rem; }
+legend { font-weight: 600; margin-bottom: .5rem; padding: 0; }
+fieldset label {
+  display: block; border: 1px solid var(--line); border-radius: 10px;
+  padding: .75rem 1rem; cursor: pointer; background: #fff; font-size: .97rem;
+}
+fieldset label:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+fieldset input { margin-right: .55rem; accent-color: var(--accent); }
+
+.disposition {
+  font-family: ui-sans-system, system-ui, sans-serif; font-weight: 700;
+  padding: 1rem 1.2rem; border-radius: 10px; line-height: 1.45;
+}
+.disposition.held { background: var(--held-bg); color: #fff; }
+.disposition.ok { background: var(--ok-bg); color: #fff; }
+.disposition:empty { display: none; }
+
+button {
+  font-family: ui-sans-system, system-ui, sans-serif; font-size: .92rem; font-weight: 600;
+  padding: .6rem 1.15rem; border-radius: 999px; border: 1px solid var(--ink);
+  background: var(--ink); color: var(--paper); cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.claim button, #export-btn { background: transparent; color: var(--ink); }
+.claim button:hover:not(:disabled), #export-btn:hover { background: var(--ink); color: var(--paper); }
+
+.claim {
+  border: 1px solid var(--line); border-left: 5px solid var(--amber);
+  border-radius: 10px; padding: 1rem 1.2rem; margin: .8rem 0; background: #fff; cursor: pointer;
+}
+.claim.contested { border-left-color: var(--held); }
+.claim h4 { margin: 0 0 .35rem; font-size: 1.05rem; }
+.claim h4 small { font-family: ui-sans-system, system-ui, sans-serif; font-size: .75rem; letter-spacing: .04em; }
+.claim blockquote {
+  margin: .6rem 0; padding: .35rem 0 .35rem 1rem; border-left: 3px solid var(--line);
+  color: var(--ink-soft); font-style: italic;
+}
+.meter { height: 8px; background: #efe9dc; border-radius: 999px; overflow: hidden; margin: .35rem 0 .2rem; }
+.meter > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s ease; }
+.claim.contested .meter > i { background: var(--held); }
+
+#trail { position: relative; margin-left: .5rem; padding-left: 1.6rem; }
+#trail::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+.crumb { position: relative; font-size: .92rem; padding: .55rem .7rem; margin: .45rem 0; border-radius: 8px; }
+.crumb::before {
+  content: ""; position: absolute; left: -1.6rem; top: 1.05rem; margin-left: 2px;
+  width: 10px; height: 10px; border-radius: 50%; background: var(--paper);
+  border: 2px solid var(--accent);
+}
+.crumb.highlight { background: var(--amber-bg); box-shadow: 0 0 0 1px #e5cf8f; }
+.crumb code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: .8rem; color: var(--accent); }
+.claim.highlight { box-shadow: 0 0 0 2px var(--amber); }
+
+input[type="range"] { accent-color: var(--accent); vertical-align: middle; }
+footer { border-top: 3px double var(--line); margin-top: 2.5rem; padding-top: 1rem; font-size: .88rem; color: var(--ink-soft); }
+a { color: var(--accent); }
