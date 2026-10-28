@@ -51,7 +51,13 @@ const server = createServer(async (req, res) => {
     if (req.url === '/api/extract' && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) { body += chunk; if (body.length > 65536) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request too large' })); return; } }
-      const { text, learners, gate } = JSON.parse(body || '{}');
+      let parsed;
+      try { parsed = JSON.parse(body || '{}'); } catch {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'request body is not valid JSON' }));
+        return;
+      }
+      const { text, learners, gate } = parsed;
       if (typeof text !== 'string' || text.length > 20000 || !Array.isArray(learners)) {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'expected {text: string (<=20000 chars), learners: string[]}' }));
@@ -75,16 +81,24 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Meta API not configured; the client uses its labelled LOCAL STUB.' }));
         return;
       }
-      const raw = await extractWithMeta(text, learners);
+      let raw;
+      try { raw = await extractWithMeta(text, learners); } catch (e) {
+        res.writeHead(502, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: `upstream model call failed: ${e.message}` }));
+        return;
+      }
       // Verification lives in code, outside the model (the workshop pattern):
       // a sighting is accepted only if its learner is whitelisted, its quote
       // is nonempty, and the quote is verbatim in the debrief.
       const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
       const source = norm(text);
-      const allowed = new Set(learners);
+      // The server holds its own synthetic learner whitelist (D-004 V7);
+      // the client's list is used for the prompt, never as authority.
+      const allowed = new Set(['Amara (SYNTHETIC)', 'Ben (SYNTHETIC)', 'Cora (SYNTHETIC)']);
       const sightings = [], rejected = [];
       for (const s of raw) {
-        if (!s || typeof s.quote !== 'string' || !norm(s.quote) || !allowed.has(s.learner)) { rejected.push(s); continue; }
+        const firstName = String(s?.learner || '').split(' ')[0];
+        if (!s || typeof s.quote !== 'string' || norm(s.quote).length < 20 || !allowed.has(s.learner) || !new RegExp(`\\b${firstName}\\b`).test(s.quote)) { rejected.push(s); continue; }
         if (text.includes(s.quote.trim())) sightings.push({ ...s, match: 'literal' });
         else if (source.includes(norm(s.quote))) sightings.push({ ...s, match: 'normalized' });
         else rejected.push(s);

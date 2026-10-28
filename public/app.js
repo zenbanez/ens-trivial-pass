@@ -60,8 +60,9 @@ const GATE9 = {
 
 // --- warrant crumbs (Warrants v0 minimal shape) ---
 // content_hash is a real SHA-256 over a canonical payload:
-//   JSON.stringify({action, target, context, from, issued_at}) with context
-//   keys sorted. Anyone holding the exported trail can recompute it.
+//   JSON.stringify({action, target, context, from, issued_at}) with keys
+//   deep-sorted at every level (the replacer sorts the root object too).
+//   Anyone holding the exported trail can recompute it byte for byte.
 const crumbs = [];
 let lastCrumb = null;
 const randHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -117,14 +118,18 @@ function stubExtract(text) {
 // the match kind travels with the sighting and is shown in the Twin.
 const LEARNER_NAMES = new Set(LEARNERS.map((l) => l.name));
 let CLAIM_SEQ = 0;
-const RUN_ID = randHex(3);
+let RUN_SEQ = 0;
 function verifyQuotes(sightings, text) {
   const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
   const sourceNorm = norm(text);
   const ok = [], rejected = [];
   for (const s of sightings || []) {
     const quote = String(s?.quote || '');
-    if (!s || !LEARNER_NAMES.has(s.learner) || !norm(quote)) { rejected.push(s); continue; }
+    const firstName = String(s?.learner || '').split(' ')[0];
+    // A verified quote must be evidence about THIS learner (D-004 V3):
+    // nonempty and long enough to mean something, naming the learner,
+    // and verbatim in the debrief.
+    if (!s || !LEARNER_NAMES.has(s.learner) || norm(quote).length < 20 || !new RegExp(`\\b${firstName}\\b`).test(quote)) { rejected.push(s); continue; }
     if (text.includes(quote.trim())) ok.push({ ...s, match: 'literal' });
     else if (sourceNorm.includes(norm(quote))) ok.push({ ...s, match: 'normalized' });
     else rejected.push(s);
@@ -165,7 +170,7 @@ function decayed(claim) {
 function claimCard(c, i) {
   return `
     <article class="claim ${c.contested ? 'contested' : ''}">
-      <h4>${escapeHtml(c.learner)} — ${escapeHtml(c.class)} <small>[${escapeHtml(c.status)}]</small></h4>
+      <h4>${escapeHtml(c.learner)} — ${escapeHtml(c.class)} <small>[${escapeHtml(c.status)} · run ${c.run ?? 1}]</small></h4>
       <p>${escapeHtml(c.statement)}</p>
       <p><small>Confidence at assertion: ${c.confidence} · decayed (read-time, ${$('age').value}d): <strong>${decayed(c)}</strong><br>
       Sighting: “${escapeHtml(c.quote)}” · extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match)<br>
@@ -190,8 +195,14 @@ function renderTwin() {
   }));
   document.querySelectorAll('[data-signoff]').forEach((b) => b.addEventListener('click', async () => {
     const c = CLAIMS[Number(b.dataset.signoff)];
+    // Contesting is not vetoing (D-004 V6): a contested claim may still be
+    // signed, but never silently — the teacher confirms with eyes open and
+    // the crumb records that the claim was contested at sign-off.
+    if (c.contested && !confirm('This claim is CONTESTED. Contesting is not vetoing, but sign-off will admit it to the Twin with its contest attached. Continue?')) return;
     c.status = 'signed';
-    await crumb('ens.claim.signoff', c.id, 'Teacher sign-off: claim admitted to the Twin by a human, not by the extractor', { claim: c.id });
+    await crumb('ens.claim.signoff', c.id, c.contested
+      ? 'Teacher sign-off of a CONTESTED claim: admitted with contest attached, eyes open'
+      : 'Teacher sign-off: claim admitted to the Twin by a human, not by the extractor', { claim: c.id, contested_at_signoff: Boolean(c.contested) });
     renderTwin();
   }));
 }
@@ -241,17 +252,24 @@ async function runExtraction() {
   if (verified.rejected.length) {
     await crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote empty, learner unknown, or quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
   }
+  const runNo = ++RUN_SEQ;
   await crumb('ens.evidence.extract', 'debrief:demo', locus === 'local'
     ? `Extraction ran at the declared local locus (this machine, stub); ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`
     : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`,
-  { extractor: extractorLabel, locus, parent: reg.warrant_id });
-  SIGHTINGS = verified.ok;
-  CLAIMS = [];
+  { extractor: extractorLabel, locus, parent: reg.warrant_id, run: runNo, debrief_hash: 'sha256:' + (await sha256Hex(text)) });
+  // Claims accumulate across runs (D-004 V4): earlier claims — signed and
+  // contested included — are preserved and marked with their run, never
+  // emptied by a new extraction. WT-I07 applies to the view, not just crumbs.
+  SIGHTINGS = [...SIGHTINGS, ...verified.ok];
   for (const s of verified.ok) {
     const cl = claimFrom(s);
-    const id = `claim_${RUN_ID}_${++CLAIM_SEQ}`;
-    const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, { learner: s.learner, match: s.match });
-    CLAIMS.push({ id, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, crumb: cc.warrant_id });
+    const id = `claim_r${runNo}_${++CLAIM_SEQ}`;
+    const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, {
+      learner: s.learner, match: s.match, run: runNo,
+      quote_hash: 'sha256:' + (await sha256Hex(s.quote)),
+      statement_hash: 'sha256:' + (await sha256Hex(cl.statement)),
+    });
+    CLAIMS.push({ id, run: runNo, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, crumb: cc.warrant_id });
   }
   $('extractor-note').textContent = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code${verified.rejected.length ? `, ${verified.rejected.length} rejected` : ''}. Claims are proposed — a teacher signs them into the Twin.`;
   renderTwin();
