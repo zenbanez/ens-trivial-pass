@@ -119,6 +119,7 @@ function stubExtract(text) {
 const LEARNER_NAMES = new Set(LEARNERS.map((l) => l.name));
 let CLAIM_SEQ = 0;
 let RUN_SEQ = 0;
+const SESSION_ID = randHex(3); // trails exported from two sessions cannot collide (D-004 round 3)
 function verifyQuotes(sightings, text) {
   const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
   const sourceNorm = norm(text);
@@ -263,7 +264,7 @@ async function runExtraction() {
   SIGHTINGS = [...SIGHTINGS, ...verified.ok];
   for (const s of verified.ok) {
     const cl = claimFrom(s);
-    const id = `claim_r${runNo}_${++CLAIM_SEQ}`;
+    const id = `claim_${SESSION_ID}_r${runNo}_${++CLAIM_SEQ}`;
     const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, {
       learner: s.learner, match: s.match, run: runNo,
       quote_hash: 'sha256:' + (await sha256Hex(s.quote)),
