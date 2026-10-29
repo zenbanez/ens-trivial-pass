@@ -14,6 +14,7 @@
   <nav class="steps">
     <a href="#debrief-panel"><b>1</b>The debrief</a>
     <a href="#gate-panel"><b>2</b>The Nine Gates</a>
+    <a href="#manual-panel"><b>2.5</b>Record by hand (model off)</a>
     <a href="#twin-panel"><b>3</b>The Twin</a>
     <a href="#trail-panel"><b>4</b>The trail</a>
     <a href="#console-panel"><b>⚙</b>Agent console</a>
@@ -45,6 +46,17 @@
     <p id="disposition" class="disposition"></p>
     <button id="extract-btn">Run extraction</button>
     <p class="note" id="extractor-note"></p>
+  </section>
+
+  <section id="manual-panel">
+    <h2>Manual sighting entry — model off</h2>
+    <p>Switch the model off and record what <em>you</em> observed, by hand. Pick the learner and type the observation in your own words. It flows through the <strong>same verification, sign-off, and warrant trail</strong> as the automated path, but under a teacher-authored posture: the text is yours, not a quote a model pulled from the debrief. No model runs.</p>
+    <label for="manual-learner">Learner</label>
+    <select id="manual-learner"></select>
+    <label for="manual-observation">Observation — your own words (at least 10 characters)</label>
+    <textarea id="manual-observation" rows="3" placeholder="e.g. Amara quietly asked whether her work was right"></textarea>
+    <button id="manual-btn">Record by hand (model off)</button>
+    <p class="note" id="manual-note"></p>
   </section>
 
   <section id="twin-panel">
@@ -84,5 +96,6 @@
 </footer>
 
 <script src="app.js"></script>
+<script type="module" src="manual-sighting.mjs"></script>
 </body>
 </html>
