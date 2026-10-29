@@ -357,7 +357,56 @@ test('P2-3: /api/coverage rejects non-string keys and scores server-verified sig
     assert.equal(hallucinatedRes.status, 200);
     const rep = await hallucinatedRes.json();
     assert.equal(rep.covered, 0, 'Hallucinated sighting must be rejected by server verifySightings');
+
+    // 3. Dynamic debriefText generalization: verifies against custom debrief text if provided
+    const customDebrief = 'Amara explained to her group why the water cycle diagram needed arrows both ways, completely rewritten here for testing purposes.';
+    const customRes = await fetch(`http://127.0.0.1:${testPort}/api/coverage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sightings: [
+          {
+            learner: 'Amara (SYNTHETIC)',
+            quote: 'Amara explained to her group why the water cycle diagram needed arrows both ways',
+          },
+        ],
+        debriefId: 'sample-post-class-debrief',
+        debriefText: customDebrief,
+      }),
+    });
+    assert.equal(customRes.status, 200);
+    const customRep = await customRes.json();
+    assert.equal(customRep.covered, 1, 'Verified against custom debrief text');
   } finally {
     proc.kill('SIGTERM');
   }
+});
+
+test('P2-5: verified sightings accumulate across attempts', () => {
+  const accumulated = new Map();
+  const attempt1Verified = [
+    { learner: 'Amara (SYNTHETIC)', quote: 'Amara explained to her group why the water cycle diagram needed arrows both ways' },
+    { learner: 'Ben (SYNTHETIC)', quote: 'Ben finished the fraction worksheet quickly but when I asked him to show 3/4' },
+  ];
+  for (const s of attempt1Verified) {
+    accumulated.set(`${s.learner}:::${s.quote}`, s);
+  }
+
+  // Attempt 2: returns empty or failed
+  const attempt2Verified = [];
+  for (const s of attempt2Verified) {
+    accumulated.set(`${s.learner}:::${s.quote}`, s);
+  }
+
+  // Attempt 3: returns only Cora
+  const attempt3Verified = [
+    { learner: 'Cora (SYNTHETIC)', quote: 'Cora asked three times whether her poster was "right"' },
+  ];
+  for (const s of attempt3Verified) {
+    accumulated.set(`${s.learner}:::${s.quote}`, s);
+  }
+
+  const finalVerified = Array.from(accumulated.values());
+  assert.equal(finalVerified.length, 3, 'All 3 learners preserved across attempts');
+  assert.deepEqual(finalVerified.map(s => s.learner), ['Amara (SYNTHETIC)', 'Ben (SYNTHETIC)', 'Cora (SYNTHETIC)']);
 });

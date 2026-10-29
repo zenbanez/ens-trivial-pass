@@ -299,12 +299,14 @@ async function runExtraction() {
   await waitStep();
   if (locus === 'hosted') { renderTwin(); renderConsole(); return; }
 
-  const text = $('debrief').value;
+    const text = $('debrief').value;
   const MAX_RETRIES = 2; // at most 2 retries (3 attempts total), local locus only
   let attempt = 0;
   let verified = null;
   let extractorLabel = '';
   let retryPayload = null;
+  // P2-5: Accumulate verified sightings across attempts so earlier attempt successes survive later partial runs
+  const accumulatedVerified = new Map();
 
   while (attempt <= MAX_RETRIES) {
     attempt++;
@@ -362,12 +364,22 @@ async function runExtraction() {
     verified = verifyQuotes(sightings, text);
     const allRejected = [...(sightings._serverRejected || []), ...verified.rejected];
     verified.rejected = allRejected;
+
+    // P2-5: register newly verified sightings into the session accumulator
+    for (const s of (verified.ok || [])) {
+      const key = `${s.learner}:::${s.quote}`;
+      if (!accumulatedVerified.has(key)) {
+        accumulatedVerified.set(key, s);
+      }
+    }
+    const currentCombinedOk = Array.from(accumulatedVerified.values());
+
     $('verify-feedback').innerHTML = allRejected.length
       ? `<span class="fail">✗ ${allRejected.length} rejected</span> <small>${allRejected.map((s) => `${escapeHtml(s?.quote || '(empty)')} — ${escapeHtml(s?.reason || 'not verbatim')}`).join(' · ')}</small>`
-      : `<span class="pass">✓ all ${verified.ok.length} sightings pass deterministic checks</span> <small>quote verbatim · names learner · ≥20 chars · learner whitelisted</small>`;
+      : `<span class="pass">✓ all ${currentCombinedOk.length} sightings pass deterministic checks</span> <small>quote verbatim · names learner · ≥20 chars · learner whitelisted</small>`;
     turn('VERIFY', isRetry ? `evidence_verify (retry ${attempt - 1} checks, code not model)` : 'evidence_verify (code, not model)',
       `${verified.ok.length} verified, ${verified.rejected.length} rejected — deterministic checks, the extractor cannot skip this`,
-      JSON.stringify({ accepted: verified.ok, rejected: verified.rejected }, null, 2));
+      JSON.stringify({ accepted: currentCombinedOk, rejected: verified.rejected }, null, 2));
     await waitStep();
 
     if (verified.rejected.length > 0) {
@@ -379,8 +391,8 @@ async function runExtraction() {
       } else if (locus === 'local' && attempt > MAX_RETRIES) {
         // Retries exhausted: escalate unresolved rejections to teacher (P2-1)
         await crumb('ens.evidence.escalate', 'debrief:demo', `Verification rejections unresolved after ${MAX_RETRIES} retries (${attempt} attempts exhausted); ${verified.rejected.length} unresolved rejection(s) escalated to teacher`, { attempts: attempt, unresolved_rejections: verified.rejected.length });
-        turn('ESCALATE', 'Human escalation — unresolved rejections', `${verified.rejected.length} sighting(s) unresolved after ${MAX_RETRIES} retries. Escalated to teacher; ${verified.ok.length} verified sighting(s) proceed to proposed claims.`, JSON.stringify(verified.rejected, null, 2));
-        if (verified.ok.length === 0) {
+        turn('ESCALATE', 'Human escalation — unresolved rejections', `${verified.rejected.length} sighting(s) unresolved after ${MAX_RETRIES} retries. Escalated to teacher; ${currentCombinedOk.length} verified sighting(s) proceed to proposed claims.`, JSON.stringify(verified.rejected, null, 2));
+        if (currentCombinedOk.length === 0) {
           $('extractor-note').innerHTML = `<strong class="fail">PROPOSED CLAIMS BLOCKED:</strong> All ${verified.rejected.length} sightings failed verification after ${MAX_RETRIES} retries.`;
           renderTwin();
           renderConsole();
@@ -395,11 +407,18 @@ async function runExtraction() {
     if (locus !== 'local') break;
   }
 
-  // Score coverage against ground truth fixtures
+  const finalVerifiedSightings = Array.from(accumulatedVerified.values());
+  const finalRejectedSightings = verified?.rejected || [];
+
+  // Score coverage against ground truth fixtures (generalized with debriefText)
   try {
     const covRes = await fetch('/api/coverage', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sightings: verified.ok, debriefId: 'sample-post-class-debrief' }),
+      body: JSON.stringify({
+        sightings: finalVerifiedSightings,
+        debriefId: 'sample-post-class-debrief',
+        debriefText: text,
+      }),
     });
     if (covRes.ok) {
       COVERAGE_REPORT = await covRes.json();
@@ -410,12 +429,12 @@ async function runExtraction() {
 
   const runNo = ++RUN_SEQ;
   await crumb('ens.evidence.extract', 'debrief:demo', locus === 'local'
-    ? `Extraction ran at the declared local locus (this machine; extractor: ${extractorLabel}); ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`
-    : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`,
+    ? `Extraction ran at the declared local locus (this machine; extractor: ${extractorLabel}); ${finalVerifiedSightings.length} verified sighting(s), ${finalRejectedSightings.length} rejected`
+    : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${finalVerifiedSightings.length} verified sighting(s), ${finalRejectedSightings.length} rejected`,
   { extractor: extractorLabel, locus, parent: reg.warrant_id, run: runNo, debrief_hash: 'sha256:' + (await sha256Hex(text)) });
 
-  SIGHTINGS = [...SIGHTINGS, ...verified.ok];
-  for (const s of verified.ok) {
+  SIGHTINGS = [...SIGHTINGS, ...finalVerifiedSightings];
+  for (const s of finalVerifiedSightings) {
     const cl = claimFrom(s);
     const id = `claim_${SESSION_ID}_r${runNo}_${++CLAIM_SEQ}`;
     const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, {
@@ -427,14 +446,14 @@ async function runExtraction() {
   }
 
   turn('PROPOSE', 'claim_propose from verified sightings',
-    `${verified.ok.length} claim(s) proposed; none enters the Twin without teacher sign-off`, null);
+    `${finalVerifiedSightings.length} claim(s) proposed; none enters the Twin without teacher sign-off`, null);
   const coverageNote = (COVERAGE_REPORT && !COVERAGE_REPORT.passed)
     ? ` <span class="warn">(Coverage shortfall: ${COVERAGE_REPORT.covered}/${COVERAGE_REPORT.total} below threshold ${COVERAGE_REPORT.thresholdPercentage}%; surfaces to teacher for review)</span>`
     : '';
-  const escalationNote = verified.rejected.length
-    ? ` <span class="fail">(${verified.rejected.length} rejected sighting(s) escalated to teacher after retries)</span>`
+  const escalationNote = finalRejectedSightings.length
+    ? ` <span class="fail">(${finalRejectedSightings.length} rejected sighting(s) escalated to teacher after retries)</span>`
     : '';
-  $('extractor-note').innerHTML = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code.${escalationNote}${coverageNote} Claims are proposed — a teacher signs them into the Twin.`;
+  $('extractor-note').innerHTML = `Extractor used: ${extractorLabel}. ${finalVerifiedSightings.length} sighting(s) quote-verified in code.${escalationNote}${coverageNote} Claims are proposed — a teacher signs them into the Twin.`;
   renderTwin();
   renderConsole();
 }

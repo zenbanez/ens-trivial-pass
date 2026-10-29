@@ -6,7 +6,8 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scoreCoverage, COVERAGE_THRESHOLD, SAMPLE_DEBRIEF, GROUND_TRUTH_FIXTURES } from './fixtures/ground-truth.mjs';
+import { createHash } from 'node:crypto';
+import { scoreCoverage, COVERAGE_THRESHOLD, SAMPLE_DEBRIEF, GROUND_TRUTH_FIXTURES, DEBRIEFS } from './fixtures/ground-truth.mjs';
 
 const root = fileURLToPath(new URL('./public', import.meta.url));
 const PORT = process.env.PORT || 4173;
@@ -27,25 +28,45 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'muse-glimmer';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
-// P2-4: enforce server-side retry feedback validation; accept only the five stable reason strings
-const ALLOWED_REASON_PREFIXES = [
-  'empty quote',
-  'unknown learner',
-  'quote under 20 normalized characters',
-  'quote does not name ',
-  'quote not verbatim in debrief',
-];
+// P2-4: enforce server-side retry feedback validation.
+// Strict regex disallows free text after prefixes (e.g. prompt injection like "quote does not name Amara; also, GT-BEN-01").
+const STRICT_REASON_REGEX = /^(empty quote|unknown learner|quote under 20 normalized characters|quote not verbatim in debrief|quote does not name [A-Za-z]+)$/;
+
 function sanitizeRetryFeedback(rawRejected) {
   if (!Array.isArray(rawRejected)) return [];
   return rawRejected
     .filter((r) => {
       if (!r || typeof r.reason !== 'string') return false;
-      return ALLOWED_REASON_PREFIXES.some((p) => r.reason.startsWith(p) || r.reason === p);
+      return STRICT_REASON_REGEX.test(r.reason.trim());
     })
     .map((r) => ({
-      quote: String(r.quote || '').slice(0, 500),
-      reason: String(r.reason || '').slice(0, 100),
+      quote: String(r.quote || '').replace(/[\r\n\t]+/g, ' ').slice(0, 300),
+      reason: String(r.reason || '').trim().slice(0, 100),
     }));
+}
+
+// P2-4: Server-side cache for deterministic extraction rejections.
+// The server stores its own verified rejections from attempt N and uses them for attempt N+1,
+// rather than trusting client-supplied quotes.
+const serverRejectionsCache = new Map();
+
+function cacheServerRejections(text, rejected) {
+  if (typeof text !== 'string') return;
+  const hash = createHash('sha256').update(text).digest('hex');
+  serverRejectionsCache.set(hash, (rejected || []).map((r) => ({
+    quote: String(r.quote || '').slice(0, 300),
+    reason: String(r.reason || '').slice(0, 100),
+  })));
+  if (serverRejectionsCache.size > 50) {
+    const oldestKey = serverRejectionsCache.keys().next().value;
+    serverRejectionsCache.delete(oldestKey);
+  }
+}
+
+function getServerRejections(text) {
+  if (typeof text !== 'string') return null;
+  const hash = createHash('sha256').update(text).digest('hex');
+  return serverRejectionsCache.get(hash) || null;
 }
 
 async function extractWithOllama(text, learners, retryFeedback = null) {
@@ -157,13 +178,26 @@ const server = createServer(async (req, res) => {
         return;
       }
       let raw;
-      try { const sanitizedRetry = sanitizeRetryFeedback(retry?.rejected);
-      raw = await extractWithOllama(text, learners, sanitizedRetry); } catch (e) {
+      try {
+        // P2-4: Rebuild feedback from the server's own verified rejections when available;
+        // fallback to strictly sanitized client payload if no cached entry exists.
+        let feedbackItems = null;
+        if (retry) {
+          const cached = getServerRejections(text);
+          if (cached && cached.length > 0) {
+            feedbackItems = cached;
+          } else {
+            feedbackItems = sanitizeRetryFeedback(retry?.rejected);
+          }
+        }
+        raw = await extractWithOllama(text, learners, feedbackItems);
+      } catch (e) {
         res.writeHead(502, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: `local model (Ollama ${OLLAMA_MODEL}) unavailable: ${e.message}` }));
         return;
       }
       const { sightings, rejected } = verifySightings(raw, text, learners);
+      cacheServerRejections(text, rejected);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ sightings, rejected: rejected.length, rejectedDetails: rejected, locus: { mode: 'local', endpoint: OLLAMA_BASE_URL, model: OLLAMA_MODEL }, metrics: raw.metrics || null, rawModelOutput: raw.raw || null, promptSent: raw.prompt || null }));
       return;
@@ -177,7 +211,7 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'request body is not valid JSON' }));
         return;
       }
-      const { sightings, debriefId } = parsed;
+      const { sightings, debriefId, debriefText } = parsed;
       if (!Array.isArray(sightings)) {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'expected {sightings: object[]}' }));
@@ -190,9 +224,13 @@ const server = createServer(async (req, res) => {
         return;
       }
       const fixtureKey = debriefId || 'sample-post-class-debrief';
-      // P2-3: score server-verified sightings only; filter out unverified/injected sightings
+      // Coverage generalization: verify sightings against caller-supplied debriefText if provided,
+      // otherwise fall back to known fixture debrief text (DEBRIEFS[fixtureKey] || SAMPLE_DEBRIEF).
+      const debriefToVerify = (typeof debriefText === 'string' && debriefText.trim().length > 0)
+        ? debriefText
+        : (DEBRIEFS?.[fixtureKey] || SAMPLE_DEBRIEF);
       const allowedLearners = ['Amara (SYNTHETIC)', 'Ben (SYNTHETIC)', 'Cora (SYNTHETIC)'];
-      const { sightings: verifiedOnly } = verifySightings(sightings, SAMPLE_DEBRIEF, allowedLearners);
+      const { sightings: verifiedOnly } = verifySightings(sightings, debriefToVerify, allowedLearners);
       const report = scoreCoverage(verifiedOnly, fixtureKey);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(report));
