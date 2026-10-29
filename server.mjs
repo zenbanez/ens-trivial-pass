@@ -44,7 +44,16 @@ async function extractWithOllama(text, learners) {
   const data = await res.json();
   const content = (data.response || '').replace(/^```json?|```$/gm, '').trim();
   const parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
-  return (parsed.sightings || []).map((s) => ({ ...s, extractor: `ollama:${OLLAMA_MODEL} (local)` }));
+  const sightings = (parsed.sightings || []).map((s) => ({ ...s, extractor: `ollama:${OLLAMA_MODEL} (local)` }));
+  // Real measured fields only (Agent Console): Ollama reports these itself.
+  sightings.metrics = {
+    promptTokens: data.prompt_eval_count ?? null,
+    evalTokens: data.eval_count ?? null,
+    totalSeconds: data.total_duration ? Math.round(data.total_duration / 1e8) / 10 : null,
+  };
+  sightings.raw = content;
+  sightings.prompt = prompt;
+  return sightings;
 }
 
 function verifySightings(raw, text, learners) {
@@ -54,10 +63,15 @@ function verifySightings(raw, text, learners) {
   const sightings = [], rejected = [];
   for (const s of raw) {
     const firstName = String(s?.learner || '').split(' ')[0];
-    if (!s || typeof s.quote !== 'string' || norm(s.quote).length < 20 || !allowed.has(s.learner) || !new RegExp(`\\b${firstName}\\b`).test(s.quote)) { rejected.push(s); continue; }
+    // Each rejection carries its reason (D-004 round 4 / D-009 retry contract):
+    // the retry loop and the console feedback band consume these verbatim.
+    if (!s || typeof s?.quote !== 'string' || !norm(s.quote)) { rejected.push({ ...s, reason: 'empty quote' }); continue; }
+    if (!allowed.has(s.learner)) { rejected.push({ ...s, reason: 'unknown learner' }); continue; }
+    if (norm(s.quote).length < 20) { rejected.push({ ...s, reason: 'quote under 20 normalized characters' }); continue; }
+    if (!new RegExp(`\\b${firstName}\\b`).test(s.quote)) { rejected.push({ ...s, reason: `quote does not name ${firstName}` }); continue; }
     if (text.includes(s.quote.trim())) sightings.push({ ...s, match: 'literal' });
     else if (source.includes(norm(s.quote))) sightings.push({ ...s, match: 'normalized' });
-    else rejected.push(s);
+    else rejected.push({ ...s, reason: 'quote not verbatim in debrief' });
   }
   return { sightings, rejected };
 }
@@ -118,7 +132,7 @@ const server = createServer(async (req, res) => {
       }
       const { sightings, rejected } = verifySightings(raw, text, learners);
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ sightings, rejected: rejected.length, locus: { mode: 'local', endpoint: OLLAMA_BASE_URL, model: OLLAMA_MODEL } }));
+      res.end(JSON.stringify({ sightings, rejected: rejected.length, rejectedDetails: rejected, locus: { mode: 'local', endpoint: OLLAMA_BASE_URL, model: OLLAMA_MODEL }, metrics: raw.metrics || null, rawModelOutput: raw.raw || null, promptSent: raw.prompt || null }));
       return;
     }
     if (req.url === '/api/extract' && req.method === 'POST') {
@@ -165,7 +179,7 @@ const server = createServer(async (req, res) => {
       // is nonempty, and the quote is verbatim in the debrief.
       const { sightings, rejected } = verifySightings(raw, text, learners);
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ sightings, rejected: rejected.length, locus: { mode: 'hosted-synthetic', endpoint: MODEL_API_BASE_URL, model: MODEL_API_MODEL, syntheticOnly: true } }));
+      res.end(JSON.stringify({ sightings, rejected: rejected.length, rejectedDetails: rejected, locus: { mode: 'hosted-synthetic', endpoint: MODEL_API_BASE_URL, model: MODEL_API_MODEL, syntheticOnly: true } }));
       return;
     }
     const path = normalize(join(root, req.url === '/' ? 'index.html' : req.url.split('?')[0]));

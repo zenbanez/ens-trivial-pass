@@ -36,8 +36,8 @@ const GATE9 = {
     walk: [
       ['1. Declared Locus', 'Pass', 'This machine, operated by the demo user, named in the registration crumb.'],
       ['2. Boundary Containment', 'Pass', 'Debrief, transcript, and sightings stay on this machine.'],
-      ['3. In-Flight Transit Scope', 'Pass', 'No transit: extraction is in-process; every buffer is local.'],
-      ['4. Instrument Identity and Held Weights', 'Pass', 'The extractor is pinned and named in every crumb (Meta model id, or LOCAL STUB).'],
+      ['3. In-Flight Transit Scope', 'Pass', 'No hosted transit: debrief and sightings stay on this machine (browser ↔ local server ↔ local Ollama).'],
+      ['4. Instrument Identity and Held Weights', 'Pass', 'The extractor is pinned and named in every crumb: the Ollama model actually run on this machine, or — only if it is unavailable — the labelled LOCAL STUB.'],
       ['5. Capability-Gap Posture', 'Pass', 'If this machine could not run it, the channel would be refused, not provisionally admitted.'],
       ['6. Technical Enforcement Evidence', 'Outstanding', 'Simulated, not produced. This demo supplies specification, not telemetry.'],
     ],
@@ -150,6 +150,50 @@ function claimFrom(sighting) {
 let SIGHTINGS = [], CLAIMS = [], meta = { metaConfigured: false };
 const $ = (id) => document.getElementById(id);
 
+// --- Agent Console (D-008): turns over the same run state ---
+const TURNS = [];
+const TOOLS = [
+  ['channel_admit(locus)', 'model', 'Admit the capture channel only if all Nine Gates pass at the declared locus. Refused: hosted without declaration.'],
+  ['evidence_extract(debrief)', 'model', 'Extract sightings from the debrief at the admitted locus. Cannot run before admission.'],
+  ['evidence_verify(sightings)', 'code', 'Deterministic, code not model: learner whitelisted, quote verbatim and naming the learner, >=20 chars. The extractor cannot call or skip this.'],
+  ['claim_propose(sighting)', 'model', 'Propose a claim from a verified sighting. Enters nothing by itself.'],
+  ['claim_signoff(claim)', 'human', 'HUMAN ONLY. A teacher admits a proposed claim to the Twin. No model may call this.'],
+  ['claim_contest(claim)', 'human', 'HUMAN ONLY. Mark a claim contested; preserved, never deleted.'],
+];
+let stepResolve = null;
+function waitStep() {
+  if (!$('step-mode')?.checked) return Promise.resolve();
+  $('next-turn').disabled = false;
+  return new Promise((r) => { stepResolve = r; });
+}
+function turn(kind, title, detail, inspector) {
+  const t = { n: TURNS.length + 1, kind, title, detail, inspector: inspector || null, at: new Date().toISOString() };
+  TURNS.push(t); renderConsole(); return t;
+}
+function renderConsole() {
+  if (!$('tools-list')) return;
+  $('tools-list').innerHTML = TOOLS.map(([sig, who, note]) =>
+    `<div class="tool ${who === 'human' ? 'human' : ''}"><code>${escapeHtml(sig)}</code> <span class="st ${who === 'human' ? 'held' : 'open'}">${who}</span><br><small>${escapeHtml(note)}</small></div>`).join('');
+  $('turns').innerHTML = TURNS.length ? TURNS.map((t) => `
+    <div class="turn ${t.kind === 'HUMAN' ? 'human-turn' : ''}">
+      <span class="chip ${t.kind === 'HUMAN' ? 'human' : ''}">${escapeHtml(t.kind)}</span>
+      <strong> Turn ${t.n} — ${escapeHtml(t.title)}</strong><br><small>${escapeHtml(t.detail)}</small>
+      ${t.inspector ? `<details><summary>what the model saw / raw record</summary><pre>${escapeHtml(t.inspector)}</pre></details>` : ''}
+    </div>`).join('') : '<p><small>No turns yet. Run the gate to begin.</small></p>';
+  // Checklist: Nine Gates (from current gate walk state) + run milestones.
+  const locus = document.querySelector('input[name=locus]:checked')?.value || 'hosted';
+  const g9 = GATE9[locus];
+  const items = [
+    ...GATES_1_8.map(([g]) => [g.split('—')[0].trim(), 'done', 'walked in UI']),
+    ['Gate 9 — Processing Locus', g9.admitted ? 'done' : 'held', g9.disposition.split('.')[0]],
+    ['Sightings verified', SIGHTINGS.length ? 'done' : 'open', `${SIGHTINGS.length} verified sighting(s) in code`],
+    ['Claims signed into Twin', CLAIMS.some((c) => c.status === 'signed') ? 'done' : 'open', `${CLAIMS.filter((c) => c.status === 'signed').length}/${CLAIMS.length} signed`],
+    ['Trail recomputes', crumbs.length > 1 ? 'done' : 'open', `${crumbs.length} crumb(s), hash-chained`],
+  ];
+  $('checklist').innerHTML = items.map(([name, st, by]) =>
+    `<div class="check"><span class="st ${st}">${st.toUpperCase()}</span> <strong>${escapeHtml(name)}</strong><br><small>Settled by: ${escapeHtml(by)}</small></div>`).join('');
+}
+
 function renderGates() {
   $('gates').innerHTML = GATES_1_8.map(([g, r, n]) =>
     `<div class="gate"><strong>${g}</strong> <span class="pass">${r}</span><br><small>${n}</small></div>`).join('');
@@ -161,6 +205,7 @@ function renderGates() {
   $('disposition').className = 'disposition ' + (g9.admitted ? 'ok' : 'held');
   $('extract-btn').disabled = !g9.admitted;
   $('extract-btn').textContent = g9.admitted ? 'Run extraction' : 'Extraction refused — channel held';
+  renderConsole();
 }
 
 function decayed(claim) {
@@ -177,7 +222,7 @@ function claimCard(c, i) {
       <div class="meter"><i style="width:${Math.round(d * 100)}%"></i></div>
       <p><small>Confidence ${c.confidence} at assertion → <strong>${d.toFixed(2)}</strong> after ${$('age').value} days (computed at read time — drag the slider)</small></p>
       <blockquote>“${escapeHtml(c.quote)}”</blockquote>
-      <p><small>Extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match)<br>
+      <p><small>Extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match) · quote ${escapeHtml((c.quoteHash || '').slice(0, 19))}… · statement ${escapeHtml((c.statementHash || '').slice(0, 19))}…<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
       ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
@@ -199,7 +244,8 @@ function renderTwin() {
     const c = CLAIMS[Number(b.dataset.contest)];
     c.contested = true;
     await crumb('ens.claim.contest', c.id, 'Teacher contests the claim; claim preserved and marked contested', { claim: c.id });
-    renderTwin();
+    turn('HUMAN', `claim_contest(${c.id})`, 'Human turn: teacher contests the claim; it is preserved, never deleted', null);
+    renderTwin(); renderConsole();
   }));
   document.querySelectorAll('[data-signoff]').forEach((b) => b.addEventListener('click', async () => {
     const c = CLAIMS[Number(b.dataset.signoff)];
@@ -211,7 +257,8 @@ function renderTwin() {
     await crumb('ens.claim.signoff', c.id, c.contested
       ? 'Teacher sign-off of a CONTESTED claim: admitted with contest attached, eyes open'
       : 'Teacher sign-off: claim admitted to the Twin by a human, not by the extractor', { claim: c.id, contested_at_signoff: Boolean(c.contested) });
-    renderTwin();
+    turn('HUMAN', `claim_signoff(${c.id})`, 'Human turn: teacher admits the claim to the Twin. No model may call this tool.', null);
+    renderTwin(); renderConsole();
   }));
 }
 
@@ -244,7 +291,9 @@ async function runExtraction() {
   }[locus];
   const reg = await crumb('ens.channel.register', 'channel:post-class-debrief', regNote,
     { locus, gate9: locus === 'hosted' ? 'held' : locus === 'local' ? 'admitted-on-specification' : 'admitted-synthetic-only', synthetic_only: locus === 'hosted-synthetic' });
-  if (locus === 'hosted') { renderTwin(); return; }
+  turn('GATE', `channel_admit(locus="${locus}")`, regNote, JSON.stringify(reg, null, 2));
+  await waitStep();
+  if (locus === 'hosted') { renderTwin(); renderConsole(); return; }
   const text = $('debrief').value;
   let sightings, extractorLabel;
   if (locus === 'local') {
@@ -260,6 +309,7 @@ async function runExtraction() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `server ${res.status}`);
       sightings = data.sightings;
+      sightings._metrics = data.metrics; sightings._raw = data.rawModelOutput; sightings._prompt = data.promptSent; sightings._serverRejected = data.rejectedDetails || [];
       extractorLabel = `Ollama local model (${data.locus?.model || 'muse-glimmer'}) on this machine`;
     } catch (e) {
       sightings = stubExtract(text);
@@ -277,6 +327,7 @@ async function runExtraction() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `server ${res.status}`);
       sightings = data.sightings;
+      sightings._serverRejected = data.rejectedDetails || [];
       extractorLabel = `Meta model via API (${data.locus?.model || meta.model}) at ${data.locus?.endpoint || 'declared endpoint'} — synthetic data sent, expressly authorized`;
     } catch (e) {
       await crumb('ens.evidence.reject', 'debrief:demo', `Hosted-synthetic extraction refused/failed: ${e.message}. No fallback applied in this mode.`, { locus });
@@ -285,7 +336,21 @@ async function runExtraction() {
       return;
     }
   }
+  const m = sightings._metrics || {};
+  turn('EXTRACT', `evidence_extract via ${extractorLabel}`,
+    `${sightings.length} raw sighting(s) proposed${m.evalTokens ? ` · ${m.promptTokens ?? '?'} prompt + ${m.evalTokens} eval tokens · ${m.totalSeconds ?? '?'}s (measured by Ollama)` : ''}`,
+    sightings._prompt ? `PROMPT SENT:\n${sightings._prompt}\n\nRAW MODEL OUTPUT (before verification):\n${sightings._raw || ''}` : JSON.stringify(sightings, null, 2));
+  await waitStep();
   const verified = verifyQuotes(sightings, text);
+  const allRejected = [...(sightings._serverRejected || []), ...verified.rejected];
+  verified.rejected = allRejected;
+  $('verify-feedback').innerHTML = allRejected.length
+    ? `<span class="fail">✗ ${allRejected.length} rejected</span> <small>${allRejected.map((s) => `${escapeHtml(s?.quote || '(empty)')} — ${escapeHtml(s?.reason || 'not verbatim')}`).join(' · ')}</small>`
+    : `<span class="pass">✓ all ${verified.ok.length} sightings pass deterministic checks</span> <small>quote verbatim · names learner · ≥20 chars · learner whitelisted</small>`;
+  turn('VERIFY', 'evidence_verify (code, not model)',
+    `${verified.ok.length} verified, ${verified.rejected.length} rejected — deterministic checks, the extractor cannot skip this`,
+    JSON.stringify({ accepted: verified.ok, rejected: verified.rejected }, null, 2));
+  await waitStep();
   if (verified.rejected.length) {
     await crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote empty, learner unknown, or quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
   }
@@ -306,10 +371,13 @@ async function runExtraction() {
       quote_hash: 'sha256:' + (await sha256Hex(s.quote)),
       statement_hash: 'sha256:' + (await sha256Hex(cl.statement)),
     });
-    CLAIMS.push({ id, run: runNo, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, crumb: cc.warrant_id });
+    CLAIMS.push({ id, run: runNo, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, quoteHash: cc.context.quote_hash, statementHash: cc.context.statement_hash, crumb: cc.warrant_id });
   }
+  turn('PROPOSE', 'claim_propose from verified sightings',
+    `${verified.ok.length} claim(s) proposed; none enters the Twin without teacher sign-off`, null);
   $('extractor-note').textContent = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code${verified.rejected.length ? `, ${verified.rejected.length} rejected` : ''}. Claims are proposed — a teacher signs them into the Twin.`;
   renderTwin();
+  renderConsole();
 }
 
 // --- init ---
@@ -324,8 +392,23 @@ $('export-btn').addEventListener('click', () => {
   a.click();
 });
 fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}); hosted-synthetic server authorization is ${c.hostedSyntheticAuthorized ? 'ON' : 'OFF (operator must set HOSTED_SYNTHETIC_AUTHORIZED=1)'}. The model is called ONLY on that authorized path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus uses the deterministic LOCAL STUB — not a model; hosted-synthetic will refuse.'; }).catch(() => {});
+$('verify-trail-btn')?.addEventListener('click', async () => {
+  let bad = 0;
+  for (const c of crumbs) {
+    const recomputed = 'sha256:' + (await sha256Hex(canonical({ action: c.action, target: c.target, context: c.context, from: c.from, issued_at: c.issued_at })));
+    if (recomputed !== c.content_hash) bad++;
+  }
+  $('verify-trail-result').textContent = bad
+    ? `✗ ${bad}/${crumbs.length} crumb hash(es) DO NOT recompute. The trail has been altered since the crumbs were written.`
+    : `✓ ${crumbs.length}/${crumbs.length} crumb hashes recompute in this browser. Change one byte of a quote, statement, or note and this check fails.`;
+});
+$('next-turn')?.addEventListener('click', () => { $('next-turn').disabled = true; stepResolve?.(); stepResolve = null; });
+$('view-teacher')?.addEventListener('click', () => { $('console-panel').hidden = true; $('view-teacher').classList.add('on'); $('view-console').classList.remove('on'); });
+$('view-console')?.addEventListener('click', () => { $('console-panel').hidden = false; renderConsole(); $('view-console').classList.add('on'); $('view-teacher').classList.remove('on'); $('console-panel').scrollIntoView({ behavior: 'smooth' }); });
+
 (async () => {
   await crumb('ens.session.open', 'demo', 'Synthetic demo session opened; all learners are synthetic personas');
   renderGates();
   renderTwin();
+  renderConsole();
 })();

@@ -16,7 +16,12 @@
     <a href="#gate-panel"><b>2</b>The Nine Gates</a>
     <a href="#twin-panel"><b>3</b>The Twin</a>
     <a href="#trail-panel"><b>4</b>The trail</a>
+    <a href="#console-panel"><b>⚙</b>Agent console</a>
   </nav>
+  <p class="viewtoggle">Surface:
+    <button id="view-teacher" class="toggle on">Teacher view</button>
+    <button id="view-console" class="toggle">Agent console — same run, technical layer</button>
+  </p>
 </header>
 
 <main>
@@ -49,11 +54,28 @@
     <div id="twin"></div>
   </section>
 
+  <section id="console-panel" hidden>
+    <h2>Agent Console — the technical layer</h2>
+    <p>The same run the teacher sees, as turns. <strong>Step through turns</strong> pauses after each phase so a presenter (or judge) can inspect what the model saw before the run continues.</p>
+    <p><label><input type="checkbox" id="step-mode"> Step through turns</label>
+    <button id="next-turn" disabled>Next turn ▸</button></p>
+    <div id="console-grid">
+      <aside id="tools-rail"><h3>Tools available</h3><div id="tools-list"></div></aside>
+      <div id="console-center">
+        <div id="verify-band"><h3>Verification — code, not model</h3><div id="verify-feedback"><small>No verification has run yet.</small></div></div>
+        <h3>Timeline</h3><div id="turns"></div>
+      </div>
+      <aside id="checklist-rail"><h3>Checklist — settled by evidence</h3><div id="checklist"></div></aside>
+    </div>
+  </section>
+
   <section id="trail-panel">
     <h2>4 · The warrant trail</h2>
     <p>Every consequential act leaves a crumb (Warrants v0 shape, <code>ens.*</code> namespace). Walk it: each claim traces to its sighting, its extraction, and the gate decision that allowed it.</p>
     <div id="trail"></div>
     <button id="export-btn">Download trail (JSON)</button>
+    <button id="verify-trail-btn">Verify trail — recompute every hash</button>
+    <p class="note" id="verify-trail-result"></p>
   </section>
 </main>
 
