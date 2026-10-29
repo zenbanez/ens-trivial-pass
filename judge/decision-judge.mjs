@@ -53,7 +53,12 @@ export function normalize(raw) {
 }
 
 function parse(text) {
-  const body = String(text ?? '').replace(/^```(?:json)?|```$/gm, '').trim();
+  // Extract the JSON object if the model wrapped it (code fences, trailing
+  // special tokens such as <|eot|>). The raw output is preserved verbatim in
+  // attempts; extraction here only locates the object, never repairs content.
+  let body = String(text ?? '').replace(/^```(?:json)?|```$/gm, '').trim();
+  const first = body.indexOf('{'), last = body.lastIndexOf('}');
+  if (first > 0 || (last >= 0 && last < body.length - 1)) body = body.slice(first, last + 1);
   try { return { value: JSON.parse(body), error: null }; } catch (e) { return { value: null, error: 'the reply is not valid JSON: ' + e.message.slice(0, 120) }; }
 }
 

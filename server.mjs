@@ -25,6 +25,9 @@ const HOSTED_SYNTHETIC_AUTHORIZED = /^(1|true|yes|on)$/i.test(process.env.HOSTED
 // local model (e.g. a smaller Qwen) without changing the locus claim.
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'muse-glimmer';
+// Calibration measured by the lead on the steward's hardware, 2026-10-29,
+// node judge/calibrate.mjs together (12 synthetic cases, 36 judgments):
+const CALIBRATION_SUMMARY = 'Measured on 12 synthetic cases (36 judgments): support agreed 11/12, attribution 12/12, needs-support 11/12; stated ~0.95 confidence was right 89-100% of the time by question. Enough to catch a plainly wrong judge, not enough to certify one.';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
@@ -154,6 +157,42 @@ const server = createServer(async (req, res) => {
     if (req.url === '/api/config') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ metaConfigured: Boolean(MODEL_API_KEY), model: MODEL_API_MODEL, baseUrl: MODEL_API_BASE_URL, hostedSyntheticAuthorized: HOSTED_SYNTHETIC_AUTHORIZED, localModel: OLLAMA_MODEL, ollamaBaseUrl: OLLAMA_BASE_URL }));
+      return;
+    }
+    if (req.url === '/api/judge' && req.method === 'POST') {
+      // DecisionJudge integration (D-016 framework by Subok, integrated by lead):
+      // local locus only, advisory only. The judge never admits/signs/blocks.
+      let body = '';
+      for await (const chunk of req) { body += chunk; if (body.length > 65536) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request too large' })); return; } }
+      let parsed;
+      try { parsed = JSON.parse(body || '{}'); } catch { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request body is not valid JSON' })); return; }
+      const { claims, gate } = parsed;
+      if (!Array.isArray(claims) || claims.length > 12 || claims.some((c) => !c || typeof c.learner !== 'string' || typeof c.quote !== 'string' || typeof c.statement !== 'string')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'expected {claims: [{learner, quote, statement}] (max 12)}' }));
+        return;
+      }
+      if (!gate || gate.mode !== 'local' || gate.admitted !== true) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Gate 9: the DecisionJudge runs only at the declared local locus in this integration.' }));
+        return;
+      }
+      try {
+        const { createJudge } = await import('./judge/decision-judge.mjs');
+        const { createGlimmerAdapter } = await import('./judge/adapters/glimmer.mjs');
+        const { QUESTIONS, judgeState, route } = await import('./judge/questions.mjs');
+        const judge = createJudge(createGlimmerAdapter(), { mode: 'together' });
+        const results = [];
+        for (const c of claims) {
+          const r = await judge.decide(judgeState(c), QUESTIONS);
+          results.push({ answers: r.answers, routing: route(r.answers), judge: r.judge, attempts: r.attempts.length });
+        }
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ results, calibration: CALIBRATION_SUMMARY }));
+      } catch (e) {
+        res.writeHead(502, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: `local judge unavailable: ${e.message}` }));
+      }
       return;
     }
     if (req.url === '/api/local-extract' && req.method === 'POST') {
