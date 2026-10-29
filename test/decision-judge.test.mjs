@@ -66,6 +66,14 @@ test('route: the rows that matter', () => {
   assert.equal(r(0.5, 0.9, 0.9).attention, 'look-first', 'a need on unclear evidence');
   assert.ok(r(0.5, 0.9, 0.9).flags.includes("a claim about a learner's needs rests on evidence the judge did not find clear"));
 });
+test('route: a failed or missing answer is named as such, never read as unsure', () => {
+  const ok = (p) => ({ probabilities: noul(p) }), failed = { failed: true, probabilities: null };
+  assert.deepEqual(route({ support: failed, attribution: ok(0.9), needs_support: ok(0.1) }), { flags: ['the judge did not answer'], attention: 'look' });
+  assert.deepEqual(route({ support: ok(0.9), attribution: ok(0.9) }), { flags: ['the judge did not answer'], attention: 'look' }, 'a missing answer counts as not answered');
+  assert.deepEqual(route({ support: ok(0.5), attribution: ok(0.9), needs_support: failed }), { flags: ['the judge did not answer', 'the judge is unsure'], attention: 'look' }, 'both, when both are true');
+  assert.equal(route({ support: ok(0.1), attribution: failed, needs_support: ok(0.1) }).attention, 'look-first', 'a "no" still comes first');
+  assert.ok(!route({ support: failed, attribution: failed, needs_support: failed }).flags.includes('the judge is unsure'));
+});
 test('judgeState carries only what the questions need', () => {
   assert.deepEqual(Object.keys(STATE).sort(), ['claim', 'learner', 'quote']);
   assert.deepEqual(Object.keys(STATE.claim), ['statement']);
@@ -128,7 +136,7 @@ test('malformed every time: two corrective retries, then every answer is uncerta
   assert.equal(requests.length, 1 + MAX_CORRECTIVE_RETRIES);
   for (const a of Object.values(answers)) assert.deepEqual(a, { answer: 'uncertain', probabilities: null, normalized: false, raw_probabilities: null, failed: true });
   assert.match(attempts.at(-1).retry_reason, /^gave up after 2 corrective retries: the reply is not valid JSON/);
-  assert.equal(route(answers).attention, 'look', 'a failed judge reads as unsure');
+  assert.deepEqual(route(answers), { flags: ['the judge did not answer'], attention: 'look' }, 'a failed judge is named as one, not as unsure');
 });
 test('validation refuses wrong shapes, out-of-range numbers and extra keys', () => {
   const ids = ['support'];

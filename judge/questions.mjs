@@ -57,9 +57,12 @@ export function band(p) {
  * Returns { flags: string[], attention: 'none' | 'look' | 'look-first' }.
  */
 export function route(answers) {
-  const b = (q) => band(answers?.[q]?.probabilities?.true);
+  // A missing or failed answer is its own state, never "unsettled": a judge
+  // that did not answer is not a judge that is unsure.
+  const b = (q) => (!answers?.[q] || answers[q].failed ? 'failed' : band(answers[q].probabilities?.true));
   const support = b('support'), attribution = b('attribution'), need = b('needs_support');
   const flags = [];
+  if ([support, attribution, need].includes('failed')) flags.push('the judge did not answer');
   if (attribution === 'no') flags.push('the sentence may be about another learner');
   if (support === 'no') flags.push('the quote may not show what the claim says');
   if (support === 'unsettled' || attribution === 'unsettled') flags.push('the judge is unsure');
