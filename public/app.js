@@ -289,7 +289,7 @@ async function runExtraction() {
   const locus = document.querySelector('input[name=locus]:checked').value;
   const regNote = {
     hosted: 'Channel HELD at Gate 9: undeclared hosted locus; extraction refused',
-    local: 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding; extraction strictly local (no model API call)',
+    local: 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding; extraction strictly local (local Ollama model on this machine; no hosted API call)',
     'hosted-synthetic': 'Channel admitted FOR SYNTHETIC DATA ONLY under expressly authorized hosted path; NOT Gate 9 compliance for real learner data',
   }[locus];
   const reg = await crumb('ens.channel.register', 'channel:post-class-debrief', regNote,
