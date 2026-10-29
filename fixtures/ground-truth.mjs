@@ -13,6 +13,10 @@ export const COVERAGE_THRESHOLD = 0.66; // 2 out of 3 expected sightings (66.7% 
 
 export const SAMPLE_DEBRIEF = `Amara explained to her group why the water cycle diagram needed arrows both ways, and two classmates copied her reasoning into their notebooks. Ben finished the fraction worksheet quickly but when I asked him to show 3/4 with the paper strips he folded them into eighths instead and looked unsure. Cora asked three times whether her poster was "right" before she would start, then produced the most careful labelled diagram in the class once she began.`;
 
+export const DEBRIEFS = {
+  'sample-post-class-debrief': SAMPLE_DEBRIEF,
+};
+
 export const GROUND_TRUTH_FIXTURES = {
   'sample-post-class-debrief': [
     {
