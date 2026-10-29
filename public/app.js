@@ -228,7 +228,9 @@ function claimCard(c, i) {
       <blockquote>“${escapeHtml(c.quote)}”</blockquote>
       <p><small>Extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match) · quote ${escapeHtml((c.quoteHash || '').slice(0, 19))}… · statement ${escapeHtml((c.statementHash || '').slice(0, 19))}…<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
-      ${c.judgment ? `<p><small><strong>DecisionJudge</strong> (${escapeHtml(c.judgment.judge.adapter)}/${escapeHtml(c.judgment.judge.model)}, ${escapeHtml(c.judgment.judge.signal)}): support ${escapeHtml(c.judgment.answers.support?.answer || '?')} (p=${c.judgment.answers.support?.probabilities?.true ?? '—'}), attribution ${escapeHtml(c.judgment.answers.attribution?.answer || '?')}, route: ${escapeHtml(c.judgment.routing.flags.join('; ') || 'no flags')} · attention: ${escapeHtml(c.judgment.routing.attention)}</small></p>` : ''}
+      ${c.judgment ? (Object.values(c.judgment.answers).some((a) => a?.failed)
+        ? `<p><small><strong>DecisionJudge did not answer</strong> (${escapeHtml(c.judgment.judge.adapter)}/${escapeHtml(c.judgment.judge.model)}): one or more questions failed after retries. This is not a judgment of uncertainty. Advisory only; the teacher's reading stands on its own.</small></p>`
+        : `<p><small><strong>DecisionJudge</strong> (${escapeHtml(c.judgment.judge.adapter)}/${escapeHtml(c.judgment.judge.model)}, ${escapeHtml(c.judgment.judge.signal)}): support ${escapeHtml(c.judgment.answers.support?.answer || '?')} (p=${c.judgment.answers.support?.probabilities?.true ?? '—'}), attribution ${escapeHtml(c.judgment.answers.attribution?.answer || '?')}, route: ${escapeHtml(c.judgment.routing.flags.join('; ') || 'no flags')} · attention: ${escapeHtml(c.judgment.routing.attention)}</small></p>`) : ''}
       ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
     </article>`;
@@ -554,12 +556,18 @@ $('judge-btn')?.addEventListener('click', async () => {
     for (let k = 0; k < proposed.length; k++) {
       const c = proposed[k];
       c.judgment = { ...data.results[k], calibration: data.calibration };
-      await crumb('ens.judgment.assess', c.id, `DecisionJudge advisory: support=${c.judgment.answers.support?.answer}, attribution=${c.judgment.answers.attribution?.answer}, attention=${c.judgment.routing.attention}. Advisory only; teacher still disposes.`, {
+      const judgeFailed = Object.values(c.judgment.answers).some((a) => a?.failed);
+      await crumb('ens.judgment.assess', c.id, judgeFailed
+        ? 'DecisionJudge DID NOT ANSWER after retries. Not an uncertainty judgment. Advisory only; teacher still disposes.'
+        : `DecisionJudge advisory: support=${c.judgment.answers.support?.answer}, attribution=${c.judgment.answers.attribution?.answer}, attention=${c.judgment.routing.attention}. Advisory only; teacher still disposes.`, {
         claim: c.id, judge_adapter: c.judgment.judge.adapter, judge_model: c.judgment.judge.model, judge_locus: 'local',
       });
       turn('JUDGE', `DecisionJudge on ${c.id}`, `support=${c.judgment.answers.support?.answer} · attention=${c.judgment.routing.attention} · ${c.judgment.judge.signal}`, JSON.stringify(c.judgment, null, 2));
     }
-    $('judge-note').textContent = `Judged. ${data.calibration || ''}`;
+    const anyFailed = CLAIMS.some((c) => c.judgment && Object.values(c.judgment.answers).some((a) => a?.failed));
+    $('judge-note').textContent = anyFailed
+      ? `The judge did not answer one or more questions after retries (shown as DID NOT ANSWER, not uncertainty). ${data.calibration || ''}`
+      : `Judged. ${data.calibration || ''}`;
   } catch (e) {
     $('judge-note').textContent = `DecisionJudge did not run: ${e.message}. Claims remain proposed; sign-off is unaffected.`;
   }

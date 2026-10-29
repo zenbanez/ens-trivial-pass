@@ -208,3 +208,15 @@ test('calibrate: wrong, unsettled and failed answers are each counted, not hidde
   assert.deepEqual([top.n, top.right_rate], [10, 0.8], 'stated 0.95, right 0.8 of the time: shown, not adjusted');
   assert.match(describe(report).find((l) => l.startsWith('attribution')), /^attribution: 8 of 10 settled answers agreed with the labels; 1 unsettled, 1 failed; Brier /);
 });
+
+// Lead integration regression (D-016 verification request): real model replies
+// can carry trailing special tokens or surrounding prose. Locating the JSON
+// object is allowed; guessing content is not.
+test('parse: a reply ending in <|eot|> parses; prose with stray braces fails and retries', async () => {
+  reset(); queue = [JSON.stringify(all(noul(0.95), noul(0.95), noul(0.05))) + '<|eot|>'];
+  const r1 = await glimmer().decide(STATE, QUESTIONS);
+  assert.equal(r1.answers.support.answer, 'supported');
+  reset(); queue = [JSON.stringify(all(noul(0.95), noul(0.95), noul(0.05))) + ' some prose {x}'];
+  const r2 = await glimmer().decide(STATE, QUESTIONS);
+  assert.equal(r2.attempts.length > 1, true, 'malformed prose reply must consume corrective retries');
+});

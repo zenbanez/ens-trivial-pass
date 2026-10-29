@@ -1,0 +1,380 @@
+{
+  "run": {
+    "adapter": "glimmer-wrapper",
+    "model": "muse-glimmer",
+    "locus": {
+      "mode": "local",
+      "endpoint": "http://127.0.0.1:11434"
+    },
+    "mode": "together",
+    "signal": "self-reported, uncalibrated model signal",
+    "cases": 12,
+    "judgments": 36,
+    "caveat": "36 judgments from 12 synthetic cases: enough to catch a judge that is plainly wrong, not enough to certify one."
+  },
+  "summary": {
+    "support": {
+      "judgments": 12,
+      "settled": 12,
+      "agreed": 11,
+      "agreement": 0.9166666666666666,
+      "unsettled": 0,
+      "failed": 0,
+      "brier": 0.07304166666666667,
+      "honesty": [
+        {
+          "stated_from": 0.7,
+          "stated_to": 0.9,
+          "n": 3,
+          "mean_stated": 0.88,
+          "right_rate": 1
+        },
+        {
+          "stated_from": 0.9,
+          "stated_to": 1,
+          "n": 9,
+          "mean_stated": 0.9455555555555555,
+          "right_rate": 0.8888888888888888
+        }
+      ]
+    },
+    "attribution": {
+      "judgments": 12,
+      "settled": 12,
+      "agreed": 12,
+      "agreement": 1,
+      "unsettled": 0,
+      "failed": 0,
+      "brier": 0.0014500000000000014,
+      "honesty": [
+        {
+          "stated_from": 0.9,
+          "stated_to": 1,
+          "n": 12,
+          "mean_stated": 0.9699999999999999,
+          "right_rate": 1
+        }
+      ]
+    },
+    "needs_support": {
+      "judgments": 12,
+      "settled": 12,
+      "agreed": 11,
+      "agreement": 0.9166666666666666,
+      "unsettled": 0,
+      "failed": 0,
+      "brier": 0.07314166666666665,
+      "honesty": [
+        {
+          "stated_from": 0.9,
+          "stated_to": 1,
+          "n": 12,
+          "mean_stated": 0.9541666666666666,
+          "right_rate": 0.9166666666666666
+        }
+      ]
+    }
+  },
+  "rows": [
+    {
+      "id": "JC-01",
+      "note": "supported strength",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": true,
+          "p": 0.95,
+          "answer": "supported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.98,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.02,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-02",
+      "note": "statement goes far beyond the quote",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": false,
+          "p": 0.12,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.97,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.02,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-03",
+      "note": "supported need",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": true,
+          "p": 0.95,
+          "answer": "supported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.98,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": true,
+          "p": 0.92,
+          "answer": "needs-support",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-04",
+      "note": "overreach: the quote says he finished the worksheet",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": false,
+          "p": 0.12,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.97,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": true,
+          "p": 0.08,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-05",
+      "note": "supported strength from part of a sentence",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": true,
+          "p": 0.9,
+          "answer": "supported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.98,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.02,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-06",
+      "note": "supported need",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": true,
+          "p": 0.95,
+          "answer": "supported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.98,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": true,
+          "p": 0.9,
+          "answer": "needs-support",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-07",
+      "note": "supported strength in a mixed sentence",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": true,
+          "p": 0.95,
+          "answer": "supported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.98,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.02,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-08",
+      "note": "a need the quote never shows",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": false,
+          "p": 0.12,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.97,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": true,
+          "p": 0.91,
+          "answer": "needs-support",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-09",
+      "note": "Amara's sentence credited to Ben",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": false,
+          "p": 0.02,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": false,
+          "p": 0.01,
+          "answer": "other-learner",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.01,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-10",
+      "note": "Ben is the one being helped",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": false,
+          "p": 0.05,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": false,
+          "p": 0.1,
+          "answer": "other-learner",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.05,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-11",
+      "note": "the helper in a two-learner sentence",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": true,
+          "p": 0.1,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": true,
+          "p": 0.95,
+          "answer": "certain",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.05,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    },
+    {
+      "id": "JC-12",
+      "note": "Ben's sentence credited to Amara; she is not even named",
+      "attempts": 1,
+      "answers": {
+        "support": {
+          "expected": false,
+          "p": 0.02,
+          "answer": "unsupported",
+          "normalized": false
+        },
+        "attribution": {
+          "expected": false,
+          "p": 0.01,
+          "answer": "other-learner",
+          "normalized": false
+        },
+        "needs_support": {
+          "expected": false,
+          "p": 0.01,
+          "answer": "strength",
+          "normalized": false
+        }
+      }
+    }
+  ]
+}
