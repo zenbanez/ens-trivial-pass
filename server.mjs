@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scoreCoverage, COVERAGE_THRESHOLD } from './fixtures/ground-truth.mjs';
+import { scoreCoverage, COVERAGE_THRESHOLD, SAMPLE_DEBRIEF, GROUND_TRUTH_FIXTURES } from './fixtures/ground-truth.mjs';
 
 const root = fileURLToPath(new URL('./public', import.meta.url));
 const PORT = process.env.PORT || 4173;
@@ -26,6 +26,27 @@ const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'muse-glimmer';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+
+// P2-4: enforce server-side retry feedback validation; accept only the five stable reason strings
+const ALLOWED_REASON_PREFIXES = [
+  'empty quote',
+  'unknown learner',
+  'quote under 20 normalized characters',
+  'quote does not name ',
+  'quote not verbatim in debrief',
+];
+function sanitizeRetryFeedback(rawRejected) {
+  if (!Array.isArray(rawRejected)) return [];
+  return rawRejected
+    .filter((r) => {
+      if (!r || typeof r.reason !== 'string') return false;
+      return ALLOWED_REASON_PREFIXES.some((p) => r.reason.startsWith(p) || r.reason === p);
+    })
+    .map((r) => ({
+      quote: String(r.quote || '').slice(0, 500),
+      reason: String(r.reason || '').slice(0, 100),
+    }));
+}
 
 async function extractWithOllama(text, learners, retryFeedback = null) {
   const feedbackBlock = (Array.isArray(retryFeedback) && retryFeedback.length > 0)
@@ -136,7 +157,8 @@ const server = createServer(async (req, res) => {
         return;
       }
       let raw;
-      try { raw = await extractWithOllama(text, learners, retry?.rejected); } catch (e) {
+      try { const sanitizedRetry = sanitizeRetryFeedback(retry?.rejected);
+      raw = await extractWithOllama(text, learners, sanitizedRetry); } catch (e) {
         res.writeHead(502, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: `local model (Ollama ${OLLAMA_MODEL}) unavailable: ${e.message}` }));
         return;
@@ -161,7 +183,17 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'expected {sightings: object[]}' }));
         return;
       }
-      const report = scoreCoverage(sightings, debriefId || 'sample-post-class-debrief');
+      // P2-3: string keys only; reject caller-supplied arrays or custom fixture objects
+      if (debriefId !== undefined && (typeof debriefId !== 'string' || !GROUND_TRUTH_FIXTURES[debriefId])) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid debriefId; expected known string fixture key' }));
+        return;
+      }
+      const fixtureKey = debriefId || 'sample-post-class-debrief';
+      // P2-3: score server-verified sightings only; filter out unverified/injected sightings
+      const allowedLearners = ['Amara (SYNTHETIC)', 'Ben (SYNTHETIC)', 'Cora (SYNTHETIC)'];
+      const { sightings: verifiedOnly } = verifySightings(sightings, SAMPLE_DEBRIEF, allowedLearners);
+      const report = scoreCoverage(verifiedOnly, fixtureKey);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(report));
       return;

@@ -376,13 +376,16 @@ async function runExtraction() {
         await crumb('ens.evidence.retry', 'debrief:demo', `Bounded retry ${attempt}/${MAX_RETRIES}: returning ${verified.rejected.length} rejection reason(s) verbatim to local extractor`, { attempt, reasons: verified.rejected.map((r) => r.reason || 'not verbatim') });
         continue;
       } else if (locus === 'local' && attempt > MAX_RETRIES) {
-        // Third failure: escalate to teacher
-        await crumb('ens.evidence.escalate', 'debrief:demo', `Verification rejections unresolved after ${MAX_RETRIES} retries (${attempt} attempts exhausted); proposed claims blocked pending teacher resolution`, { attempts: attempt, unresolved_rejections: verified.rejected.length });
-        turn('ESCALATE', 'Human escalation — proposed claims blocked', `3 extraction attempts exhausted with rejections (${verified.rejected.length} unresolved). Proposed claims blocked pending teacher review.`, JSON.stringify(verified.rejected, null, 2));
-        $('extractor-note').innerHTML = `<strong class="fail">PROPOSED CLAIMS BLOCKED:</strong> ${verified.rejected.length} sighting(s) failed deterministic verification after ${MAX_RETRIES} retries. Verification strictness is never relaxed; escalating to teacher.`;
-        renderTwin();
-        renderConsole();
-        return;
+        // Retries exhausted: escalate unresolved rejections to teacher (P2-1)
+        await crumb('ens.evidence.escalate', 'debrief:demo', `Verification rejections unresolved after ${MAX_RETRIES} retries (${attempt} attempts exhausted); ${verified.rejected.length} unresolved rejection(s) escalated to teacher`, { attempts: attempt, unresolved_rejections: verified.rejected.length });
+        turn('ESCALATE', 'Human escalation — unresolved rejections', `${verified.rejected.length} sighting(s) unresolved after ${MAX_RETRIES} retries. Escalated to teacher; ${verified.ok.length} verified sighting(s) proceed to proposed claims.`, JSON.stringify(verified.rejected, null, 2));
+        if (verified.ok.length === 0) {
+          $('extractor-note').innerHTML = `<strong class="fail">PROPOSED CLAIMS BLOCKED:</strong> All ${verified.rejected.length} sightings failed verification after ${MAX_RETRIES} retries.`;
+          renderTwin();
+          renderConsole();
+          return;
+        }
+        break;
       }
     } else {
       break;
@@ -424,7 +427,13 @@ async function runExtraction() {
 
   turn('PROPOSE', 'claim_propose from verified sightings',
     `${verified.ok.length} claim(s) proposed; none enters the Twin without teacher sign-off`, null);
-  $('extractor-note').textContent = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code${verified.rejected.length ? `, ${verified.rejected.length} rejected` : ''}. Claims are proposed — a teacher signs them into the Twin.`;
+  const coverageNote = (COVERAGE_REPORT && !COVERAGE_REPORT.passed)
+    ? ` <span class="warn">(Coverage shortfall: ${COVERAGE_REPORT.covered}/${COVERAGE_REPORT.total} below threshold ${COVERAGE_REPORT.thresholdPercentage}%; surfaces to teacher for review)</span>`
+    : '';
+  const escalationNote = verified.rejected.length
+    ? ` <span class="fail">(${verified.rejected.length} rejected sighting(s) escalated to teacher after retries)</span>`
+    : '';
+  $('extractor-note').innerHTML = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code.${escalationNote}${coverageNote} Claims are proposed — a teacher signs them into the Twin.`;
   renderTwin();
   renderConsole();
 }

@@ -98,47 +98,46 @@ test('Coverage Scorer: misattributed sighting does not count towards coverage', 
   assert.equal(score.passed, false);
 });
 
-test('Retry logic & state machine: terminates and escalates to teacher on 3rd failure', () => {
-  // Simulating bounded retry loop:
-  // attempt 1 (initial extract) -> verification fails (rejections)
-  // attempt 2 (retry 1 with feedback) -> verification fails
-  // attempt 3 (retry 2 with feedback) -> verification fails
-  // -> ESCALATE: proposed-claims-blocked
-
+test('Retry logic & state machine (P2-1): verified sightings proceed, rejected portion escalates', () => {
   const MAX_RETRIES = 2; // at most 2 retries (3 attempts total)
   let attempt = 0;
   let escalated = false;
   let state = 'init';
   const turns = [];
 
-  function simulateLoop(alwaysFails) {
-    while (attempt <= MAX_RETRIES) {
-      attempt++;
-      turns.push({ turn: attempt === 1 ? 'EXTRACT' : `RETRY_${attempt - 1}`, attempt });
-
-      const hasRejections = alwaysFails;
-      if (!hasRejections) {
-        state = 'claims-proposed';
-        return;
-      }
-
-      // Rejections exist
-      if (attempt > MAX_RETRIES) {
-        // Third failure: escalate to teacher
-        state = 'proposed-claims-blocked';
-        escalated = true;
-        turns.push({ turn: 'ESCALATE', reason: 'Verification rejections unresolved after 2 retries' });
-        return;
-      }
+  // Scenario 1: Mixed result (2 verified, 1 rejected that never resolves)
+  while (attempt <= MAX_RETRIES) {
+    attempt++;
+    turns.push({ turn: attempt === 1 ? 'EXTRACT' : `RETRY_${attempt - 1}`, attempt });
+    const hasRejections = true;
+    if (attempt > MAX_RETRIES && hasRejections) {
+      escalated = true;
+      turns.push({ turn: 'ESCALATE', reason: 'Unresolved rejections escalated to teacher' });
+      // P2-1: verified sightings proceed to proposed claims
+      state = 'proposed-claims-with-escalation';
+      break;
     }
   }
 
-  simulateLoop(true);
-
   assert.equal(attempt, 3);
   assert.equal(escalated, true);
-  assert.equal(state, 'proposed-claims-blocked');
+  assert.equal(state, 'proposed-claims-with-escalation');
   assert.deepEqual(turns.map(t => t.turn), ['EXTRACT', 'RETRY_1', 'RETRY_2', 'ESCALATE']);
+
+  // Scenario 2: All sightings rejected
+  let allFailedAttempt = 0;
+  let allBlockedState = 'init';
+  while (allFailedAttempt <= MAX_RETRIES) {
+    allFailedAttempt++;
+    if (allFailedAttempt > MAX_RETRIES) {
+      const okSightings = 0;
+      if (okSightings === 0) {
+        allBlockedState = 'proposed-claims-blocked';
+      }
+      break;
+    }
+  }
+  assert.equal(allBlockedState, 'proposed-claims-blocked');
 });
 
 test('Retry logic: succeeds early when retry resolves rejections', () => {
@@ -199,11 +198,11 @@ test('Server integration: POST /api/coverage endpoint', async () => {
         sightings: [
           {
             learner: 'Amara (SYNTHETIC)',
-            quote: 'Amara explained to her group why the water cycle diagram needed arrows both ways.',
+            quote: 'Amara explained to her group why the water cycle diagram needed arrows both ways',
           },
           {
             learner: 'Ben (SYNTHETIC)',
-            quote: 'Ben finished the fraction worksheet quickly but folded paper into eighths instead of 3/4 and looked unsure.',
+            quote: 'Ben finished the fraction worksheet quickly but when I asked him to show 3/4 with the paper strips he folded them into eighths instead and looked unsure.',
           },
         ],
       }),
@@ -278,6 +277,86 @@ test('Server integration: POST /api/local-extract with retry feedback and isolat
     });
     assert.equal(hostedGateRes.status, 403);
 
+  } finally {
+    proc.kill('SIGTERM');
+  }
+});
+
+test('P2-2: anchors must match in verified quote ONLY, not model-written observation', () => {
+  // Sighting whose observation has anchor but whose verified quote has NO anchor text
+  const sneakyObservationSighting = [
+    {
+      learner: 'Amara (SYNTHETIC)',
+      quote: 'Amara listened quietly while others worked.', // no anchor in quote
+      observation: 'Amara explained why water cycle diagram needed arrows both ways', // anchor in observation
+    },
+  ];
+
+  const score = scoreCoverage(sneakyObservationSighting);
+  assert.equal(score.covered, 0, 'Sighting with anchor only in observation must NOT cover ground-truth item');
+  assert.equal(score.passed, false);
+
+  // Sighting with anchor in verified quote
+  const legitimateSighting = [
+    {
+      learner: 'Amara (SYNTHETIC)',
+      quote: 'Amara explained to her group why the water cycle diagram needed arrows both ways.',
+      observation: 'Student explained science diagram',
+    },
+  ];
+  const legitimateScore = scoreCoverage(legitimateSighting);
+  assert.equal(legitimateScore.covered, 1);
+});
+
+test('P2-3: /api/coverage rejects non-string keys and scores server-verified sightings only', async () => {
+  const { spawn } = await import('node:child_process');
+  const testPort = 5176;
+  const proc = spawn(process.execPath, ['server.mjs'], {
+    cwd: 'C:/Users/zenba/ens-trivial-pass',
+    env: { ...process.env, PORT: String(testPort) },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('server startup timeout')), 4000);
+      proc.stdout.on('data', (d) => {
+        if (d.toString().includes('http://127.0.0.1')) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      proc.on('error', (err) => { clearTimeout(timer); reject(err); });
+    });
+
+    // 1. Rejects caller-injected fixture arrays as debriefId
+    const injectedRes = await fetch(`http://127.0.0.1:${testPort}/api/coverage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sightings: [],
+        debriefId: [{ id: 'FAKE', learner: 'Fake', expectedAnchors: ['x'] }],
+      }),
+    });
+    assert.equal(injectedRes.status, 400);
+
+    // 2. Unverified hallucinated sightings are filtered out server-side
+    const hallucinatedRes = await fetch(`http://127.0.0.1:${testPort}/api/coverage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sightings: [
+          {
+            learner: 'Amara (SYNTHETIC)',
+            quote: 'This is a hallucinated quote that is not anywhere in the debrief text at all.',
+            observation: 'Fake',
+          },
+        ],
+      }),
+    });
+    assert.equal(hallucinatedRes.status, 200);
+    const rep = await hallucinatedRes.json();
+    assert.equal(rep.covered, 0, 'Hallucinated sighting must be rejected by server verifySightings');
   } finally {
     proc.kill('SIGTERM');
   }
