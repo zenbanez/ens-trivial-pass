@@ -148,6 +148,7 @@ function claimFrom(sighting) {
 
 // --- state + rendering ---
 let SIGHTINGS = [], CLAIMS = [], meta = { metaConfigured: false };
+let COVERAGE_REPORT = null;
 const $ = (id) => document.getElementById(id);
 
 // --- Agent Console (D-008): turns over the same run state ---
@@ -187,6 +188,7 @@ function renderConsole() {
     ...GATES_1_8.map(([g]) => [g.split('—')[0].trim(), 'done', 'walked in UI']),
     ['Gate 9 — Processing Locus', g9.admitted ? 'done' : 'held', g9.disposition.split('.')[0]],
     ['Sightings verified', SIGHTINGS.length ? 'done' : 'open', `${SIGHTINGS.length} verified sighting(s) in code`],
+    ['Extraction coverage', COVERAGE_REPORT ? (COVERAGE_REPORT.passed ? 'done' : 'open') : 'open', COVERAGE_REPORT ? `${COVERAGE_REPORT.covered}/${COVERAGE_REPORT.total} (${COVERAGE_REPORT.percentage}%) — threshold ≥${COVERAGE_REPORT.thresholdPercentage}%` : 'Awaiting extraction'],
     ['Claims signed into Twin', CLAIMS.some((c) => c.status === 'signed') ? 'done' : 'open', `${CLAIMS.filter((c) => c.status === 'signed').length}/${CLAIMS.length} signed`],
     ['Trail recomputes', crumbs.length > 1 ? 'done' : 'open', `${crumbs.length} crumb(s), hash-chained`],
   ];
@@ -294,74 +296,119 @@ async function runExtraction() {
   turn('GATE', `channel_admit(locus="${locus}")`, regNote, JSON.stringify(reg, null, 2));
   await waitStep();
   if (locus === 'hosted') { renderTwin(); renderConsole(); return; }
+
   const text = $('debrief').value;
-  let sightings, extractorLabel;
-  if (locus === 'local') {
-    // Declared local locus: extraction runs on this machine via Ollama
-    // (server-side call to the local model server). No hosted API is ever
-    // contacted in this mode. If the local model is unavailable, the
-    // labelled stub carries the demo and the crumb says so.
-    try {
-      const res = await fetch('/api/local-extract', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name), gate: { mode: 'local', admitted: true } }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `server ${res.status}`);
-      sightings = data.sightings;
-      sightings._metrics = data.metrics; sightings._raw = data.rawModelOutput; sightings._prompt = data.promptSent; sightings._serverRejected = data.rejectedDetails || [];
-      extractorLabel = `Ollama local model (${data.locus?.model || 'muse-glimmer'}) on this machine`;
-    } catch (e) {
-      sightings = stubExtract(text);
-      extractorLabel = `LOCAL STUB — not a model (local model unavailable: ${e.message}; stub carried this run, on this machine only)`;
+  const MAX_RETRIES = 2; // at most 2 retries (3 attempts total), local locus only
+  let attempt = 0;
+  let verified = null;
+  let extractorLabel = '';
+  let retryPayload = null;
+
+  while (attempt <= MAX_RETRIES) {
+    attempt++;
+    const isRetry = attempt > 1;
+    let sightings;
+
+    if (locus === 'local') {
+      try {
+        const res = await fetch('/api/local-extract', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            learners: LEARNERS.map((l) => l.name),
+            gate: { mode: 'local', admitted: true },
+            retry: retryPayload ? { attempt: attempt - 1, rejected: retryPayload } : null,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+        sightings = data.sightings;
+        sightings._metrics = data.metrics; sightings._raw = data.rawModelOutput; sightings._prompt = data.promptSent; sightings._serverRejected = data.rejectedDetails || [];
+        extractorLabel = `Ollama local model (${data.locus?.model || 'muse-glimmer'}) on this machine`;
+      } catch (e) {
+        sightings = stubExtract(text);
+        extractorLabel = `LOCAL STUB — not a model (local model unavailable: ${e.message}; stub carried this run, on this machine only)`;
+      }
+    } else {
+      // hosted-synthetic: single attempt (retry loop is out of scope for live hosted per D-009)
+      try {
+        const res = await fetch('/api/extract', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name), gate: { mode: 'hosted-synthetic', admitted: true, syntheticOnly: true } }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+        sightings = data.sightings;
+        sightings._serverRejected = data.rejectedDetails || [];
+        extractorLabel = `Meta model via API (${data.locus?.model || meta.model}) at ${data.locus?.endpoint || 'declared endpoint'} — synthetic data sent, expressly authorized`;
+      } catch (e) {
+        await crumb('ens.evidence.reject', 'debrief:demo', `Hosted-synthetic extraction refused/failed: ${e.message}. No fallback applied in this mode.`, { locus });
+        $('extractor-note').textContent = `Hosted-synthetic extraction did not run: ${e.message}. Configure MODEL_API_KEY on the server, or use the declared local locus.`;
+        renderTwin();
+        return;
+      }
     }
-  } else {
-    // hosted-synthetic: the ONLY path that may call the model API. The server
-    // enforces the gate decision; without a configured key it refuses and
-    // there is deliberately no silent fallback to the stub in this mode.
-    try {
-      const res = await fetch('/api/extract', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name), gate: { mode: 'hosted-synthetic', admitted: true, syntheticOnly: true } }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `server ${res.status}`);
-      sightings = data.sightings;
-      sightings._serverRejected = data.rejectedDetails || [];
-      extractorLabel = `Meta model via API (${data.locus?.model || meta.model}) at ${data.locus?.endpoint || 'declared endpoint'} — synthetic data sent, expressly authorized`;
-    } catch (e) {
-      await crumb('ens.evidence.reject', 'debrief:demo', `Hosted-synthetic extraction refused/failed: ${e.message}. No fallback applied in this mode.`, { locus });
-      $('extractor-note').textContent = `Hosted-synthetic extraction did not run: ${e.message}. Configure MODEL_API_KEY on the server, or use the declared local locus.`;
-      renderTwin();
-      return;
+
+    const m = sightings._metrics || {};
+    const turnKind = isRetry ? 'RETRY' : 'EXTRACT';
+    const turnTitle = isRetry ? `evidence_extract (retry ${attempt - 1}/${MAX_RETRIES}) via ${extractorLabel}` : `evidence_extract via ${extractorLabel}`;
+    turn(turnKind, turnTitle,
+      `${sightings.length} raw sighting(s) proposed${m.evalTokens ? ` · ${m.promptTokens ?? '?'} prompt + ${m.evalTokens} eval tokens · ${m.totalSeconds ?? '?'}s (measured by Ollama)` : ''}`,
+      sightings._prompt ? `PROMPT SENT:\n${sightings._prompt}\n\nRAW MODEL OUTPUT (before verification):\n${sightings._raw || ''}` : JSON.stringify(sightings, null, 2));
+    await waitStep();
+
+    verified = verifyQuotes(sightings, text);
+    const allRejected = [...(sightings._serverRejected || []), ...verified.rejected];
+    verified.rejected = allRejected;
+    $('verify-feedback').innerHTML = allRejected.length
+      ? `<span class="fail">✗ ${allRejected.length} rejected</span> <small>${allRejected.map((s) => `${escapeHtml(s?.quote || '(empty)')} — ${escapeHtml(s?.reason || 'not verbatim')}`).join(' · ')}</small>`
+      : `<span class="pass">✓ all ${verified.ok.length} sightings pass deterministic checks</span> <small>quote verbatim · names learner · ≥20 chars · learner whitelisted</small>`;
+    turn('VERIFY', isRetry ? `evidence_verify (retry ${attempt - 1} checks, code not model)` : 'evidence_verify (code, not model)',
+      `${verified.ok.length} verified, ${verified.rejected.length} rejected — deterministic checks, the extractor cannot skip this`,
+      JSON.stringify({ accepted: verified.ok, rejected: verified.rejected }, null, 2));
+    await waitStep();
+
+    if (verified.rejected.length > 0) {
+      await crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote empty, learner unknown, or quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length, attempt });
+      if (locus === 'local' && attempt <= MAX_RETRIES) {
+        retryPayload = verified.rejected;
+        await crumb('ens.evidence.retry', 'debrief:demo', `Bounded retry ${attempt}/${MAX_RETRIES}: returning ${verified.rejected.length} rejection reason(s) verbatim to local extractor`, { attempt, reasons: verified.rejected.map((r) => r.reason || 'not verbatim') });
+        continue;
+      } else if (locus === 'local' && attempt > MAX_RETRIES) {
+        // Third failure: escalate to teacher
+        await crumb('ens.evidence.escalate', 'debrief:demo', `Verification rejections unresolved after ${MAX_RETRIES} retries (${attempt} attempts exhausted); proposed claims blocked pending teacher resolution`, { attempts: attempt, unresolved_rejections: verified.rejected.length });
+        turn('ESCALATE', 'Human escalation — proposed claims blocked', `3 extraction attempts exhausted with rejections (${verified.rejected.length} unresolved). Proposed claims blocked pending teacher review.`, JSON.stringify(verified.rejected, null, 2));
+        $('extractor-note').innerHTML = `<strong class="fail">PROPOSED CLAIMS BLOCKED:</strong> ${verified.rejected.length} sighting(s) failed deterministic verification after ${MAX_RETRIES} retries. Verification strictness is never relaxed; escalating to teacher.`;
+        renderTwin();
+        renderConsole();
+        return;
+      }
+    } else {
+      break;
     }
+
+    if (locus !== 'local') break;
   }
-  const m = sightings._metrics || {};
-  turn('EXTRACT', `evidence_extract via ${extractorLabel}`,
-    `${sightings.length} raw sighting(s) proposed${m.evalTokens ? ` · ${m.promptTokens ?? '?'} prompt + ${m.evalTokens} eval tokens · ${m.totalSeconds ?? '?'}s (measured by Ollama)` : ''}`,
-    sightings._prompt ? `PROMPT SENT:\n${sightings._prompt}\n\nRAW MODEL OUTPUT (before verification):\n${sightings._raw || ''}` : JSON.stringify(sightings, null, 2));
-  await waitStep();
-  const verified = verifyQuotes(sightings, text);
-  const allRejected = [...(sightings._serverRejected || []), ...verified.rejected];
-  verified.rejected = allRejected;
-  $('verify-feedback').innerHTML = allRejected.length
-    ? `<span class="fail">✗ ${allRejected.length} rejected</span> <small>${allRejected.map((s) => `${escapeHtml(s?.quote || '(empty)')} — ${escapeHtml(s?.reason || 'not verbatim')}`).join(' · ')}</small>`
-    : `<span class="pass">✓ all ${verified.ok.length} sightings pass deterministic checks</span> <small>quote verbatim · names learner · ≥20 chars · learner whitelisted</small>`;
-  turn('VERIFY', 'evidence_verify (code, not model)',
-    `${verified.ok.length} verified, ${verified.rejected.length} rejected — deterministic checks, the extractor cannot skip this`,
-    JSON.stringify({ accepted: verified.ok, rejected: verified.rejected }, null, 2));
-  await waitStep();
-  if (verified.rejected.length) {
-    await crumb('ens.evidence.reject', 'debrief:demo', `${verified.rejected.length} sighting(s) rejected by code: quote empty, learner unknown, or quote not verbatim in the debrief (the extractor proposes, code disposes)`, { rejected: verified.rejected.length });
+
+  // Score coverage against ground truth fixtures
+  try {
+    const covRes = await fetch('/api/coverage', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sightings: verified.ok, debriefId: 'sample-post-class-debrief' }),
+    });
+    if (covRes.ok) {
+      COVERAGE_REPORT = await covRes.json();
+    }
+  } catch {
+    COVERAGE_REPORT = null;
   }
+
   const runNo = ++RUN_SEQ;
   await crumb('ens.evidence.extract', 'debrief:demo', locus === 'local'
     ? `Extraction ran at the declared local locus (this machine; extractor: ${extractorLabel}); ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`
     : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${verified.ok.length} verified sighting(s), ${verified.rejected.length} rejected`,
   { extractor: extractorLabel, locus, parent: reg.warrant_id, run: runNo, debrief_hash: 'sha256:' + (await sha256Hex(text)) });
-  // Claims accumulate across runs (D-004 V4): earlier claims — signed and
-  // contested included — are preserved and marked with their run, never
-  // emptied by a new extraction. WT-I07 applies to the view, not just crumbs.
+
   SIGHTINGS = [...SIGHTINGS, ...verified.ok];
   for (const s of verified.ok) {
     const cl = claimFrom(s);
@@ -373,6 +420,7 @@ async function runExtraction() {
     });
     CLAIMS.push({ id, run: runNo, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor || extractorLabel, contested: false, status: 'proposed', ...cl, quoteHash: cc.context.quote_hash, statementHash: cc.context.statement_hash, crumb: cc.warrant_id });
   }
+
   turn('PROPOSE', 'claim_propose from verified sightings',
     `${verified.ok.length} claim(s) proposed; none enters the Twin without teacher sign-off`, null);
   $('extractor-note').textContent = `Extractor used: ${extractorLabel}. ${verified.ok.length} sighting(s) quote-verified in code${verified.rejected.length ? `, ${verified.rejected.length} rejected` : ''}. Claims are proposed — a teacher signs them into the Twin.`;

@@ -9,7 +9,7 @@
 //    only evaluates sightings that have already passed deterministic code verification.
 // 4. Threshold is displayed as a visible, inspectable constant.
 
-export const COVERAGE_THRESHOLD = 0.67; // 2 out of 3 expected sightings (67%) minimum for pass
+export const COVERAGE_THRESHOLD = 0.66; // 2 out of 3 expected sightings (66.7% -> 67%) minimum for pass
 
 export const GROUND_TRUTH_FIXTURES = {
   'sample-post-class-debrief': [

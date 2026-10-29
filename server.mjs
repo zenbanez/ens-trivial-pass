@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scoreCoverage, COVERAGE_THRESHOLD } from './fixtures/ground-truth.mjs';
 
 const root = fileURLToPath(new URL('./public', import.meta.url));
 const PORT = process.env.PORT || 4173;
@@ -26,11 +27,21 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'muse-glimmer';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
-async function extractWithOllama(text, learners) {
+async function extractWithOllama(text, learners, retryFeedback = null) {
+  const feedbackBlock = (Array.isArray(retryFeedback) && retryFeedback.length > 0)
+    ? [
+        '',
+        'CORRECTION REQUIRED: Your previous extraction attempt failed deterministic verification:',
+        ...retryFeedback.map((r) => `- Quote: "${r.quote || ''}" -> Reason: ${r.reason || 'quote not verbatim in debrief'}`),
+        'Ensure every quote is an exact, verbatim substring of the debrief (at least 20 characters), names the learner, and corresponds to what was observed. Do not invent quotes.',
+        '',
+      ]
+    : [];
   const prompt = [
     'You extract sightings from a teacher post-class debrief. The learners are SYNTHETIC demo personas.',
     'Return ONLY JSON, no prose: {"sightings":[{"learner":"<exact learner name>","quote":"<exact substring of the debrief, at least 20 characters, naming the learner>","observation":"<at most 10 words: what was observed>"}]}',
     'Use only these learner names:', learners.join(', '),
+    ...feedbackBlock,
     'Debrief:', text,
   ].join('\n');
   // think:false — Muse Glimmer is a reasoning model; structured extraction
@@ -112,7 +123,7 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'request body is not valid JSON' }));
         return;
       }
-      const { text, learners, gate } = parsed;
+      const { text, learners, gate, retry } = parsed;
       if (typeof text !== 'string' || text.length > 20000 || !Array.isArray(learners)) {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'expected {text: string (<=20000 chars), learners: string[]}' }));
@@ -125,7 +136,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       let raw;
-      try { raw = await extractWithOllama(text, learners); } catch (e) {
+      try { raw = await extractWithOllama(text, learners, retry?.rejected); } catch (e) {
         res.writeHead(502, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: `local model (Ollama ${OLLAMA_MODEL}) unavailable: ${e.message}` }));
         return;
@@ -133,6 +144,26 @@ const server = createServer(async (req, res) => {
       const { sightings, rejected } = verifySightings(raw, text, learners);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ sightings, rejected: rejected.length, rejectedDetails: rejected, locus: { mode: 'local', endpoint: OLLAMA_BASE_URL, model: OLLAMA_MODEL }, metrics: raw.metrics || null, rawModelOutput: raw.raw || null, promptSent: raw.prompt || null }));
+      return;
+    }
+    if (req.url === '/api/coverage' && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) { body += chunk; if (body.length > 65536) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request too large' })); return; } }
+      let parsed;
+      try { parsed = JSON.parse(body || '{}'); } catch {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'request body is not valid JSON' }));
+        return;
+      }
+      const { sightings, debriefId } = parsed;
+      if (!Array.isArray(sightings)) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'expected {sightings: object[]}' }));
+        return;
+      }
+      const report = scoreCoverage(sightings, debriefId || 'sample-post-class-debrief');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(report));
       return;
     }
     if (req.url === '/api/extract' && req.method === 'POST') {
