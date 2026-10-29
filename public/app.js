@@ -161,6 +161,7 @@ const TOOLS = [
   ['claim_propose(sighting)', 'model', 'Propose a claim from a verified sighting. Enters nothing by itself.'],
   ['claim_signoff(claim)', 'human', 'HUMAN ONLY. A teacher admits a proposed claim to the Twin. No model may call this.'],
   ['claim_contest(claim)', 'human', 'HUMAN ONLY. Mark a claim contested; preserved, never deleted.'],
+  ['sighting_record(teacher, manual)', 'human', 'HUMAN ONLY, model off. Teacher writes a sighting by hand; verified under the teacher-authored posture and enters the same sign-off/trail pipeline. No model runs.'],
 ];
 let stepResolve = null;
 function waitStep() {
@@ -438,8 +439,64 @@ async function runExtraction() {
   renderConsole();
 }
 
+// --- D-015: manual (model-off) sighting entry ---
+// The teacher records a sighting by hand. It is NOT the automated extraction
+// path: no model (Ollama / Meta / stub) runs. It is verified under the
+// teacher-authored posture (learner whitelisted + substantive text), then
+// enters the SAME downstream pipeline — claim proposal, teacher sign-off,
+// contest, warrant crumb — with distinct manual labels. window.ensManual is
+// the deferred ES module (public/manual-sighting.mjs); it has loaded by the
+// time a user clicks, since it only runs at event time.
+let MANUAL_SEQ = 0;
+async function recordManualSighting() {
+  const M = window.ensManual;
+  if (!M) { $('manual-note').textContent = 'The manual-entry module did not load; nothing was recorded.'; return; }
+  const learner = $('manual-learner').value;
+  const observation = String($('manual-observation').value || '').trim();
+  const entries = [{ learner, observation }];
+  const { ok, rejected } = M.verifyManualSighting(entries, LEARNER_NAMES);
+
+  if (rejected.length) {
+    await crumb('ens.evidence.reject', 'manual-entry', `Manual sighting rejected (teacher-authored posture): ${rejected[0].reason}`, { learner, reason: rejected[0].reason, manual: true });
+    $('manual-note').textContent = `Rejected: ${rejected[0].reason}. A sighting needs a named learner and at least ${M.MIN_OBSERVATION_CHARS} characters of your own observation.`;
+    turn('REJECT', 'sighting_record(teacher, manual) — rejected in code', `${rejected[0].reason}; nothing entered the Twin`, JSON.stringify(entries, null, 2));
+    return;
+  }
+
+  const s = ok[0];
+  const runNo = ++RUN_SEQ;
+  await crumb('ens.evidence.extract', 'manual-entry',
+    `Manual sighting recorded by hand with the model OFF; teacher-authored evidence is not a model quote, so it is verified substantively, not verbatim-in-debrief; ${s.learner} labelled ${s.extractor}`,
+    { extractor: M.MANUAL_EXTRACTOR_LABEL, locus: 'manual', model_off: true, run: runNo });
+  turn('MANUAL', `sighting_record(teacher, manual) — ${s.learner}`,
+    'Model off: the teacher wrote the observation by hand; verified under the teacher-authored posture (learner + substance), not verbatim-in-debrief',
+    JSON.stringify(entries, null, 2));
+  await waitStep();
+
+  SIGHTINGS.push(s);
+  const cl = claimFrom(s);
+  const id = `claim_${SESSION_ID}_m${runNo}_${++MANUAL_SEQ}`;
+  const cc = await crumb('ens.claim.assert', id,
+    `${cl.class} proposed from a manual, model-off sighting (teacher-authored); confidence ${cl.confidence}; awaits teacher sign-off`,
+    { learner: s.learner, match: s.match, source: 'manual', run: runNo,
+      quote_hash: 'sha256:' + (await sha256Hex(s.quote)),
+      statement_hash: 'sha256:' + (await sha256Hex(cl.statement)) });
+  CLAIMS.push({ id, run: runNo, learner: s.learner, quote: s.quote, match: s.match, extractor: s.extractor, source: 'manual', contested: false, status: 'proposed', ...cl, quoteHash: cc.context.quote_hash, statementHash: cc.context.statement_hash, crumb: cc.warrant_id });
+
+  turn('PROPOSE', 'claim_propose from the manual sighting',
+    'One claim proposed from the teacher-authored sighting; it enters the Twin only on teacher sign-off, like every claim', null);
+  $('manual-note').textContent = `Recorded ${s.learner} by hand (model off) — a claim is proposed. Sign it off in the Twin panel to admit it; the crumb trail carries the manual label.`;
+  $('manual-observation').value = '';
+  renderTwin();
+  renderConsole();
+}
+
 // --- init ---
 $('learners').textContent = LEARNERS.map((l) => l.name).join(', ');
+// D-015: populate the manual-entry learner picker from the same whitelist.
+$('manual-learner').innerHTML = LEARNERS.map((l) =>
+  `<option value="${l.name}">${escapeHtml(l.name)}</option>`).join('');
+$('manual-btn').addEventListener('click', recordManualSighting);
 $('debrief').value = SAMPLE;
 document.querySelectorAll('input[name=locus]').forEach((r) => r.addEventListener('change', renderGates));
 $('extract-btn').addEventListener('click', runExtraction);
