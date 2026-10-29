@@ -25,7 +25,7 @@ const HOSTED_SYNTHETIC_AUTHORIZED = /^(1|true|yes|on)$/i.test(process.env.HOSTED
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'muse-glimmer';
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
 // P2-4: enforce server-side retry feedback validation; accept only the five stable reason strings
 const ALLOWED_REASON_PREFIXES = [
