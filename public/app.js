@@ -119,6 +119,7 @@ function stubExtract(text) {
 const LEARNER_NAMES = new Set(LEARNERS.map((l) => l.name));
 let CLAIM_SEQ = 0;
 let RUN_SEQ = 0;
+let TRAIL_VERIFIED = null; // null until the Verify-trail check actually runs (D-004 P1-1)
 const SESSION_ID = randHex(3); // trails exported from two sessions cannot collide (D-004 round 3)
 function verifyQuotes(sightings, text) {
   const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -190,7 +191,7 @@ function renderConsole() {
     ['Sightings verified', SIGHTINGS.length ? 'done' : 'open', `${SIGHTINGS.length} verified sighting(s) in code`],
     ['Extraction coverage', COVERAGE_REPORT ? (COVERAGE_REPORT.passed ? 'done' : 'open') : 'open', COVERAGE_REPORT ? `${COVERAGE_REPORT.covered}/${COVERAGE_REPORT.total} (${COVERAGE_REPORT.percentage}%) — threshold ≥${COVERAGE_REPORT.thresholdPercentage}%` : 'Awaiting extraction'],
     ['Claims signed into Twin', CLAIMS.some((c) => c.status === 'signed') ? 'done' : 'open', `${CLAIMS.filter((c) => c.status === 'signed').length}/${CLAIMS.length} signed`],
-    ['Trail recomputes', crumbs.length > 1 ? 'done' : 'open', `${crumbs.length} crumb(s), hash-chained`],
+    ['Trail recomputes', TRAIL_VERIFIED === null ? 'open' : TRAIL_VERIFIED ? 'done' : 'held', TRAIL_VERIFIED === null ? 'not yet recomputed — use Verify trail' : TRAIL_VERIFIED ? 'every crumb hash recomputed in browser' : 'RECOMPUTATION FAILED — trail altered'],
   ];
   $('checklist').innerHTML = items.map(([name, st, by]) =>
     `<div class="check"><span class="st ${st}">${st.toUpperCase()}</span> <strong>${escapeHtml(name)}</strong><br><small>Settled by: ${escapeHtml(by)}</small></div>`).join('');
@@ -439,16 +440,18 @@ $('export-btn').addEventListener('click', () => {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'trail-export.json' });
   a.click();
 });
-fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}); hosted-synthetic server authorization is ${c.hostedSyntheticAuthorized ? 'ON' : 'OFF (operator must set HOSTED_SYNTHETIC_AUTHORIZED=1)'}. The model is called ONLY on that authorized path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus uses the deterministic LOCAL STUB — not a model; hosted-synthetic will refuse.'; }).catch(() => {});
+fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}); hosted-synthetic server authorization is ${c.hostedSyntheticAuthorized ? 'ON' : 'OFF (operator must set HOSTED_SYNTHETIC_AUTHORIZED=1)'}. The model is called ONLY on that authorized path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus runs the local Ollama model on this machine (deterministic LOCAL STUB only if that model is unavailable); hosted-synthetic will refuse.'; }).catch(() => {});
 $('verify-trail-btn')?.addEventListener('click', async () => {
   let bad = 0;
   for (const c of crumbs) {
     const recomputed = 'sha256:' + (await sha256Hex(canonical({ action: c.action, target: c.target, context: c.context, from: c.from, issued_at: c.issued_at })));
     if (recomputed !== c.content_hash) bad++;
   }
+  TRAIL_VERIFIED = bad === 0;
   $('verify-trail-result').textContent = bad
     ? `✗ ${bad}/${crumbs.length} crumb hash(es) DO NOT recompute. The trail has been altered since the crumbs were written.`
     : `✓ ${crumbs.length}/${crumbs.length} crumb hashes recompute in this browser. Change one byte of a quote, statement, or note and this check fails.`;
+  renderConsole();
 });
 $('next-turn')?.addEventListener('click', () => { $('next-turn').disabled = true; stepResolve?.(); stepResolve = null; });
 $('view-teacher')?.addEventListener('click', () => { $('console-panel').hidden = true; $('view-teacher').classList.add('on'); $('view-console').classList.remove('on'); });

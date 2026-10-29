@@ -38,7 +38,7 @@
     <fieldset>
       <legend>Gate 9 — Processing Locus: where does extraction run?</legend>
       <label><input type="radio" name="locus" value="hosted" checked> Hosted API (a third-party service extracts the sightings)</label>
-      <label><input type="radio" name="locus" value="local"> Declared local locus (this machine, named operator, pinned extractor — strictly local, no model API call)</label>
+      <label><input type="radio" name="locus" value="local"> Declared local locus (this machine, named operator, pinned extractor — strictly local: local Ollama model on this machine, never a hosted API)</label>
       <label><input type="radio" name="locus" value="hosted-synthetic"> Hosted, synthetic demo only (expressly authorized: synthetic text is sent to the Meta Model API; NOT Gate 9 compliance for real learner data)</label>
     </fieldset>
     <div id="gate9-walk"></div>
