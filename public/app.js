@@ -228,6 +228,7 @@ function claimCard(c, i) {
       <blockquote>“${escapeHtml(c.quote)}”</blockquote>
       <p><small>Extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match) · quote ${escapeHtml((c.quoteHash || '').slice(0, 19))}… · statement ${escapeHtml((c.statementHash || '').slice(0, 19))}…<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
+      ${c.judgment ? `<p><small><strong>DecisionJudge</strong> (${escapeHtml(c.judgment.judge.adapter)}/${escapeHtml(c.judgment.judge.model)}, ${escapeHtml(c.judgment.judge.signal)}): support ${escapeHtml(c.judgment.answers.support?.answer || '?')} (p=${c.judgment.answers.support?.probabilities?.true ?? '—'}), attribution ${escapeHtml(c.judgment.answers.attribution?.answer || '?')}, route: ${escapeHtml(c.judgment.routing.flags.join('; ') || 'no flags')} · attention: ${escapeHtml(c.judgment.routing.attention)}</small></p>` : ''}
       ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
     </article>`;
@@ -537,6 +538,33 @@ $('verify-trail-btn')?.addEventListener('click', async () => {
     ? `✗ ${bad}/${crumbs.length} crumb hash(es) DO NOT recompute. The trail has been altered since the crumbs were written.`
     : `✓ ${crumbs.length}/${crumbs.length} crumb hashes recompute in this browser. Change one byte of a quote, statement, or note and this check fails.`;
   renderConsole();
+});
+$('judge-btn')?.addEventListener('click', async () => {
+  const proposed = CLAIMS.filter((c) => c.status === 'proposed' && !c.judgment);
+  if (!proposed.length) { $('judge-note').textContent = 'No unjudged proposed claims. The judge is advisory; it does not change claim status.'; return; }
+  $('judge-btn').disabled = true;
+  $('judge-note').textContent = `Judging ${proposed.length} claim(s) with the local Glimmer wrapper… (slow on this hardware)`;
+  try {
+    const res = await fetch('/api/judge', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ claims: proposed.map((c) => ({ learner: c.learner, quote: c.quote, statement: c.statement })), gate: { mode: 'local', admitted: true } }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+    for (let k = 0; k < proposed.length; k++) {
+      const c = proposed[k];
+      c.judgment = { ...data.results[k], calibration: data.calibration };
+      await crumb('ens.judgment.assess', c.id, `DecisionJudge advisory: support=${c.judgment.answers.support?.answer}, attribution=${c.judgment.answers.attribution?.answer}, attention=${c.judgment.routing.attention}. Advisory only; teacher still disposes.`, {
+        claim: c.id, judge_adapter: c.judgment.judge.adapter, judge_model: c.judgment.judge.model, judge_locus: 'local',
+      });
+      turn('JUDGE', `DecisionJudge on ${c.id}`, `support=${c.judgment.answers.support?.answer} · attention=${c.judgment.routing.attention} · ${c.judgment.judge.signal}`, JSON.stringify(c.judgment, null, 2));
+    }
+    $('judge-note').textContent = `Judged. ${data.calibration || ''}`;
+  } catch (e) {
+    $('judge-note').textContent = `DecisionJudge did not run: ${e.message}. Claims remain proposed; sign-off is unaffected.`;
+  }
+  $('judge-btn').disabled = false;
+  renderTwin(); renderConsole();
 });
 $('next-turn')?.addEventListener('click', () => { $('next-turn').disabled = true; stepResolve?.(); stepResolve = null; });
 $('view-teacher')?.addEventListener('click', () => { $('console-panel').hidden = true; $('view-teacher').classList.add('on'); $('view-console').classList.remove('on'); });
