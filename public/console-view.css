@@ -1,0 +1,64 @@
+/* D-018 (Subok): the Agent Console's technical layer. Crisp, not decorated.
+   Colours read Sol's story-shell tokens (D-017: --ens-paper, --ens-surface,
+   --ens-ink, --ens-muted, --ens-line, --ens-accent, --ens-sage, --ens-ochre),
+   falling back to the same palette when the shell is absent. */
+#console-panel {
+  --cv-paper: var(--ens-paper, #f7f3e9);
+  --cv-ivory: var(--ens-surface, #fffdf7);
+  --cv-ink: var(--ens-ink, #173f38);
+  --cv-muted: var(--ens-muted, #506b60);
+  --cv-green: var(--ens-accent, #1e5947);
+  --cv-sage: var(--ens-sage, #e5eddb);
+  --cv-ochre: var(--ens-ochre, #8d5b21);
+  --cv-ochre-bg: #f6ead2;
+  --cv-line: var(--ens-line, #d6dece);
+  --cv-mono: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+.cv-band { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; margin: .4rem 0 .8rem; }
+.cv-pill, .ens-live {
+  display: inline-block; padding: .28rem .65rem; border-radius: 999px;
+  font: 600 .74rem/1.2 system-ui, sans-serif; letter-spacing: .02em;
+  background: var(--cv-paper, #f7f3e9); color: var(--cv-ink, #173f38); border: 1px solid var(--cv-line, #d9d3c3);
+}
+.cv-synth { background: var(--cv-ochre-bg, #f6ead2); color: var(--cv-ochre, #9a6a12); border-color: transparent; }
+.cv-ok { background: var(--cv-sage, #e5eddb); color: var(--cv-green, #1e5947); border-color: transparent; }
+.cv-bad { background: #f8dcd6; color: #8a2a17; border-color: transparent; }
+.cv-mono { font-family: var(--cv-mono); font-weight: 500; }
+
+/* The shared liveness labels (liveness.js), the same in both views. */
+.ens-live { font-size: .68rem; padding: .18rem .55rem; vertical-align: middle; }
+.ens-live-live { background: #e3edf1; color: #1d4b5c; border-color: transparent; }
+.ens-live-code { background: var(--cv-sage, #e5eddb); color: var(--cv-green, #1e5947); border-color: transparent; }
+.ens-live-human { background: var(--cv-ochre-bg, #f6ead2); color: var(--cv-ochre, #9a6a12); border-color: transparent; }
+.ens-live-warn { background: #fbe6d2; color: #8a3b00; border-color: #e9c39b; }
+.ens-live-plain { background: #ecebe5; color: #3a3f45; border-color: transparent; }
+
+.cv-opened {
+  display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: space-between;
+  padding: .6rem .8rem; margin-bottom: .8rem; border-radius: 10px;
+  background: #e3edf1; color: #1d4b5c; font-size: .9rem;
+}
+.cv-opened[hidden] { display: none; }
+.cv-back, .cv-link {
+  font: 500 .82rem/1.2 system-ui, sans-serif; cursor: pointer;
+  min-height: 36px; padding: .35rem .7rem; border-radius: 8px;
+  border: 1px solid var(--cv-line, #d9d3c3); background: var(--cv-ivory, #fffdf7); color: var(--cv-green, #1e5947);
+}
+.cv-link { font-family: var(--cv-mono); font-size: .74rem; margin-top: .45rem; }
+.cv-back:hover, .cv-link:hover { border-color: var(--cv-green, #1e5947); }
+.cv-back:focus-visible, .cv-link:focus-visible { outline: 2px solid var(--cv-green, #1e5947); outline-offset: 2px; }
+
+.cv-head { display: flex; flex-wrap: wrap; gap: .4rem .6rem; align-items: center; margin-bottom: .2rem; }
+.cv-turn.cv-selected { border: 2px solid var(--cv-green, #1e5947); }
+.cv-answers { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 .3rem; }
+.cv-q { font: .76rem/1.3 var(--cv-mono); padding: .25rem .5rem; border-radius: 6px; background: var(--cv-paper, #f7f3e9); }
+.cv-judge-line { margin: .3rem 0; font-size: .9rem; }
+.cv-att { padding: .05rem .4rem; border-radius: 5px; }
+.cv-att-look-first { background: #fbe6d2; color: #8a3b00; }
+.cv-att-look { background: var(--cv-ochre-bg, #f6ead2); color: var(--cv-ochre, #9a6a12); }
+.cv-att-none { background: var(--cv-sage, #e5eddb); color: var(--cv-green, #1e5947); }
+.cv-fine { margin: .2rem 0; font-size: .76rem; color: var(--cv-muted, #506b60); }
+
+#trail .cv-selected { background: #e3edf1; color: #1d4b5c; box-shadow: 0 0 0 2px var(--cv-green, #1e5947); }
+
