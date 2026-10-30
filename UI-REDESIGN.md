@@ -84,6 +84,16 @@ Shared liveness vocabulary belongs to the console builder's `liveness.js`;
 integration must preserve truthful LOCAL STUB, MANUAL ENTRY, failed-judge and
 escalation labels. A live browser session is not proof of live model execution.
 No fixed success, numeric confidence or calibration result is added by the shell.
+The teacher view consumes the same `ENSLiveness.forSession`, `forClaim` and
+`pill` API when D-018 is loaded. No second label classifier is maintained.
+Latest-evidence labels and per-claim source/judge pills do not upgrade stub
+or manual records to live model output. In a shell-only checkout without
+D-018, the original explicit extractor strings remain visible instead.
+
+After D-018 files are present, `node tools/verify-shared-labels.cjs` checks
+the pure shared helper's stub/manual/failed/missing-answer handling and the
+tool rail's code roles without a model call. `ENS_EXPECT_CONSOLE=1` makes
+the served smoke test require actual console modules and matching labels.
 
 ### Style tokens
 
