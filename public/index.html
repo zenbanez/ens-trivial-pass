@@ -3,36 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The Trivial Pass, Made Real — ENS Slice</title>
+<meta name="color-scheme" content="light">
+<title>ENS — Where do we go next?</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="story-shell.css">
+<link rel="stylesheet" href="console-view.css">
 </head>
-<body>
-<header>
-  <h1>The Trivial Pass, Made Real</h1>
-  <p class="sub">A synthetic-only slice of the <strong>Educational Navigation System (ENS)</strong> — ENSP001 §9's post-class debrief, passed through the Nine Gates.</p>
-  <p class="banner">ALL LEARNERS ARE SYNTHETIC. No real educational data is used, stored, or sent anywhere by this demo.</p>
-  <nav class="steps">
-    <a href="#debrief-panel"><b>1</b>The debrief</a>
-    <a href="#gate-panel"><b>2</b>The Nine Gates</a>
-    <a href="#manual-panel"><b>2.5</b>Record by hand (model off)</a>
-    <a href="#twin-panel"><b>3</b>The Twin</a>
-    <a href="#trail-panel"><b>4</b>The trail</a>
-    <a href="#console-panel"><b>⚙</b>Agent console</a>
-  </nav>
-  <p class="viewtoggle">Surface:
-    <button id="view-teacher" class="toggle on">Teacher view</button>
-    <button id="view-console" class="toggle">Agent console — same run, technical layer</button>
-  </p>
+<body class="ens-app">
+<a class="ens-skip" href="#ens-main">Skip to content</a>
+<header class="ens-header">
+<a class="ens-brand" href="#idea" aria-label="ENS overview"><span>ENS</span><span>Educational Navigation System</span></a>
+<nav class="ens-surfaces" aria-label="Application views"><a href="#idea" data-view-link="intro">Overview</a><button id="view-teacher" data-view-link="review">Guided walkthrough</button><button id="view-console" data-view-link="console">Agent Console</button></nav>
 </header>
-
-<main>
-  <section id="debrief-panel">
+<div class="ens-disclosure"><strong>All learners and debriefs are synthetic.</strong> <span id="ens-run-live">Opening this page creates one demo session; navigation keeps that session.</span><span id="ens-source-status"></span><span class="ens-session" id="ens-session-label"></span></div>
+<nav class="ens-chapters" aria-label="Presentation sequence"><a href="#idea" data-route-link="idea">The idea</a><a href="#slice" data-route-link="slice">The slice</a><a href="#debrief-panel" data-route-link="review">The demo</a><a href="#console" data-route-link="console">Under the hood</a><a href="#next" data-route-link="next">The next step</a><a href="#vision" data-route-link="vision">The Vision</a></nav>
+<main id="ens-main">
+<div id="ens-view-intro" class="ens-view"><section class="ens-story" data-story="idea" aria-labelledby="ens-idea-title">
+<div class="ens-hero"><img src="assets/ens-paper-world.png" alt="A fictional teacher and two children at a paper-sculpture classroom table, with an open book unfolding into branching paths." width="1672" height="940" fetchpriority="high">
+<div class="ens-hero-copy"><p class="ens-eyebrow">Beyond a result. Toward a next step.</p><h1 id="ens-idea-title">A grade tells us<br>how they did.<br><em>Where do we<br>go next?</em></h1><p>An Educational Navigation System helps teachers connect what they observe, build a revisable picture of a learner’s understanding, and choose what to explore next.</p><a class="ens-button ens-primary" href="#slice">See one small part <span aria-hidden="true">→</span></a><p class="ens-aside">Supporting the teacher’s judgment. Not replacing it.</p></div></div><p class="ens-caption">The broader ENS vision · AI-generated conceptual artwork, not an implemented recommendation engine.</p></section>
+<section class="ens-story ens-story-pad" data-story="slice" hidden aria-labelledby="ens-slice-title"><div class="ens-two-col"><div><p class="ens-eyebrow">The larger vision. One bounded demonstration.</p><h1 id="ens-slice-title">Start with<br><em>one moment.</em></h1><p class="ens-intro">Today, we’re showing one small part of ENS: turning a teacher’s classroom observation into a claim they can inspect, question, and decide whether to keep.</p><a class="ens-button ens-primary" href="#debrief-panel">Follow this observation →</a></div><article class="ens-note"><p class="ens-eyebrow">From the current synthetic debrief</p><blockquote id="ens-source-preview"></blockquote><p>One observation. Not a complete assessment.</p><hr><p>Teacher notices → AI proposes → teacher decides</p><p class="ens-small">The claim-proposal step in this demo is a deterministic heuristic, not a separate model call.</p></article></div></section>
+<section class="ens-story ens-story-pad" data-story="next" hidden aria-labelledby="ens-next-title"><div class="ens-two-col"><div><p class="ens-eyebrow">A small slice. A larger direction.</p><h1 id="ens-next-title">See more clearly.<br><em>Choose what<br>comes next.</em></h1><p class="ens-intro">This slice keeps a classroom observation connected to the claims made from it—and leaves admission with the teacher.</p><p>The larger ENS vision is to build that picture over time, so teachers have more to draw on when choosing the next learning opportunity.</p></div><article class="ens-note"><p class="ens-eyebrow">Proposed next steps · beyond this slice</p><h2>From a demonstration<br>to something useful.</h2><div class="ens-next-item"><h3>Connect more moments.</h3><p>Bring observations together over time, keeping sources and uncertainty visible.</p></div><div class="ens-next-item"><h3>Learn with teachers.</h3><p>Test whether the picture is understandable, contestable, and useful in teaching decisions.</p></div><div class="ens-next-item"><h3>Explore the next possibility.</h3><p>Investigate teacher-chosen learning opportunities—not automatic learner verdicts.</p></div></article></div><div class="ens-closing"><p>The next step stays human.</p><a class="ens-button ens-primary" href="#vision">The Vision →</a></div></section>
+<section class="ens-story ens-story-pad" data-story="vision" hidden aria-labelledby="ens-vision-title"><p class="ens-eyebrow">Educational Navigation System / the long-term ambition</p><h1 id="ens-vision-title">The Vision</h1><p class="ens-intro">A clearer picture of learning.<br>For everyone who helps it happen.</p><div class="ens-vision-grid"><article><h2>Empowered Teachers</h2><p>Connect classroom observations to a richer understanding of each learner—with evidence they can question and judgment that remains theirs.</p></article><article><h2>Involved Parents</h2><p>Understand the story beyond a grade and take part in meaningful conversations about their child’s learning, with appropriate privacy and sharing boundaries.</p></article><article><h2>Guided Learners</h2><p>Recognize progress, ask questions, and explore possible next steps—with support, agency, and room to grow.</p></article><article><h2>Learning Institutions</h2><p>Learn from patterns in teaching and learning to improve support—without reducing people to labels or rankings.</p></article></div><div class="ens-closing"><p>Learning moves forward. Together.</p><span>Long-term vision · not capabilities demonstrated in this slice</span></div></section></div>
+<div id="ens-view-review" class="ens-view" hidden>
+<div class="ens-page-heading"><div><p class="ens-eyebrow">Guided walkthrough / the live slice</p><h1>What does this observation support?</h1><p>Use the actual debrief, channel admission, and human decision below. AI outputs propose; people decide.</p></div><a class="ens-text-link" href="#console">Inspect this same run →</a></div>
+<nav class="ens-review-steps" aria-label="Walkthrough steps"><button data-review-step="0">1 · Debrief</button><button data-review-step="1">2 · Channel</button><button data-review-step="2">3 · Model off</button><button data-review-step="3">4 · Claims</button><button data-review-step="4">5 · Trail</button></nav>
+<p class="ens-step-help" id="ens-step-help" aria-live="polite"></p>
+<div class="ens-live-summary" id="ens-live-summary" aria-live="polite"></div>
+<div data-review-panel="0"><section id="debrief-panel">
     <h2>1 · The teacher's debrief</h2>
     <p>Synthetic class: <span id="learners"></span>. Edit the debrief, or use the sample.</p>
     <textarea id="debrief" rows="7"></textarea>
-  </section>
-
-  <section id="gate-panel">
+  </section></div>
+<div data-review-panel="1" hidden><section id="gate-panel">
     <h2>2 · The Nine Gates — channel admission</h2>
     <p>The channel is <em>post-class narrative debrief → per-learner sightings</em>. Gates 1–8 pass in minutes. Gate 9 asks where extraction runs.</p>
     <div id="gates"></div>
@@ -46,10 +48,9 @@
     <p id="disposition" class="disposition"></p>
     <button id="extract-btn">Run extraction</button>
     <p class="note" id="extractor-note"></p>
-  </section>
-
-  <section id="manual-panel">
-    <h2>Manual sighting entry — model off</h2>
+  </section></div>
+<div data-review-panel="2" hidden><section id="manual-panel">
+    <h2>3 · Manual sighting entry — model off</h2>
     <p>Switch the model off and record what <em>you</em> observed, by hand. Pick the learner and type the observation in your own words. It flows through the <strong>same verification, sign-off, and warrant trail</strong> as the automated path, but under a teacher-authored posture: the text is yours, not a quote a model pulled from the debrief. No model runs.</p>
     <label for="manual-learner">Learner</label>
     <select id="manual-learner"></select>
@@ -57,17 +58,28 @@
     <textarea id="manual-observation" rows="3" placeholder="e.g. Amara quietly asked whether her work was right"></textarea>
     <button id="manual-btn">Record by hand (model off)</button>
     <p class="note" id="manual-note"></p>
-  </section>
-
-  <section id="twin-panel">
-    <h2>3 · Sightings → claims → the Twin</h2>
+  </section></div>
+<div data-review-panel="3" hidden><section id="twin-panel">
+    <h2>4 · Sightings → claims → the Twin</h2>
     <p>Evidence and interpretation stay separate. A <strong>sighting</strong> quotes the debrief — and code, not the extractor, verifies the quote is verbatim before it counts. A <strong>claim</strong> interprets sightings, waits for <strong>teacher sign-off</strong> before it enters the Twin, and can be contested, never deleted. Confidence decays at read time; drag the slider to see it.</p>
     <label>Days since assertion: <input type="range" id="age" min="0" max="180" value="0"> <span id="age-val">0</span></label>
     <p><button id="judge-btn">Run DecisionJudge on proposed claims</button> <span class="note" id="judge-note">Advisory only (DecisionJudge, D-016): a System-One-style harness over the same local Glimmer. It never admits, signs, or blocks. Slow on this hardware — about 30 s per claim.</span></p>
     <div id="twin"></div>
-  </section>
-
-  <section id="console-panel" hidden>
+  </section></div>
+<div data-review-panel="4" id="ens-review-trail" hidden><section id="trail-panel">
+    <h2>5 · The warrant trail</h2>
+    <p>Every consequential act leaves a crumb (Warrants v0 shape, <code>ens.*</code> namespace). Walk it: each claim traces to its sighting, its extraction, and the gate decision that allowed it.</p>
+    <div id="trail"></div>
+    <button id="export-btn">Download trail (JSON)</button>
+    <button id="verify-trail-btn">Verify trail — recompute every hash</button>
+    <p class="note" id="verify-trail-result"></p>
+  </section></div>
+<div class="ens-review-bottom"><button class="ens-button" id="ens-review-back">← Previous</button><span class="ens-small" id="ens-review-progress"></span><button class="ens-button ens-primary" id="ens-review-next">Next →</button></div>
+<div class="ens-after-demo"><a href="#console">Follow the same run in Agent Console →</a><a href="#next">Conclusion &amp; next steps →</a></div>
+</div>
+<div id="ens-view-console" class="ens-view" hidden>
+<div class="ens-page-heading"><div><p class="ens-eyebrow">Agent Console / same session, same evidence</p><h1>Now, <em>show your work.</em></h1><p>The mechanism behind the teacher walkthrough. Changing views never starts a second run.</p></div><a class="ens-text-link" href="#twin-panel">← Return to teacher review</a></div>
+<section id="console-panel" hidden>
     <h2>Agent Console — the technical layer</h2>
     <p>The same run the teacher sees, as turns. <strong>Step through turns</strong> pauses after each phase so a presenter (or judge) can inspect what the model saw before the run continues.</p>
     <p><label><input type="checkbox" id="step-mode"> Step through turns</label>
@@ -81,22 +93,15 @@
       <aside id="checklist-rail"><h3>Checklist — settled by evidence</h3><div id="checklist"></div></aside>
     </div>
   </section>
-
-  <section id="trail-panel">
-    <h2>4 · The warrant trail</h2>
-    <p>Every consequential act leaves a crumb (Warrants v0 shape, <code>ens.*</code> namespace). Walk it: each claim traces to its sighting, its extraction, and the gate decision that allowed it.</p>
-    <div id="trail"></div>
-    <button id="export-btn">Download trail (JSON)</button>
-    <button id="verify-trail-btn">Verify trail — recompute every hash</button>
-    <p class="note" id="verify-trail-result"></p>
-  </section>
+<div id="ens-console-trail"></div>
+<div class="ens-after-demo"><a href="#trail-panel">Inspect the trail with the teacher →</a><a class="ens-button ens-primary" href="#next">Where does this go next? →</a></div>
+</div>
 </main>
-
-<footer>
-  <p>Candidate specifications demonstrated: ENS-0001, ENS-0002, ENS007, ENS011, ENSP001 §§4, 7–9. ENS is research under governed validation (ZenOS INT-0042/WS-0042); nothing here is adopted doctrine, DepEd policy, or legal advice. Extraction: Muse Glimmer locally via Ollama at the declared local locus; Meta model via API only on the expressly authorized hosted-synthetic path; a deterministic <strong>LOCAL STUB — not a model</strong> only if the local model is unavailable.</p>
-</footer>
-
+<footer class="ens-footer"><p><strong>The Trivial Pass, Made Real.</strong> A bounded synthetic-only ENS research demo. Broader vision and proposed next steps are not implemented capabilities or evidence of educational validity.</p><p>Extraction: local Ollama model at the declared local locus, with explicitly labelled LOCAL STUB fallback only if unavailable; Meta API only on the expressly authorized hosted-synthetic path. A declared local label is not containment telemetry. The advisory judge never admits, signs, or blocks.</p><p>ENS is research under governed validation; no ENS adoption, DepEd representation, legal or institutional compliance claim. All runtime outputs and records remain inspectable in the same session.</p></footer>
 <script src="app.js"></script>
+<script src="liveness.js"></script>
 <script type="module" src="manual-sighting.mjs"></script>
+<script src="story-shell.js"></script>
+<script src="console-view.js"></script>
 </body>
 </html>
