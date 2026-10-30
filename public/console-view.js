@@ -166,6 +166,29 @@
   });
   document.addEventListener('ens:crumb', () => { if (!$('console-panel')?.hidden) afterRender(); });
 
+  // Step through holds a run between turns. The run is started from the
+  // walkthrough, but Next turn lives in the console, so the walkthrough says
+  // the run is paused and offers both ways on (R10-5d). The note is removed
+  // as soon as the turn is released.
+  function pauseNote() {
+    let note = $('cv-pause-note');
+    if (!note) {
+      note = Object.assign(document.createElement('div'), { id: 'cv-pause-note', className: 'cv-pause-note' });
+      note.setAttribute('role', 'status');
+      note.innerHTML = `<span><strong>Paused by Step through.</strong> The run waits for the next turn, so you can inspect what the model saw before it continues.</span>
+        <span class="cv-pause-actions"><button type="button" class="cv-link" data-cv-next-turn>Next turn ▸</button>
+        <button type="button" class="cv-link" data-cv-open-console>Open the Agent Console ▸</button></span>`;
+      $('extract-btn')?.insertAdjacentElement('afterend', note);
+    }
+    return note;
+  }
+  document.addEventListener('ens:step-wait', () => { pauseNote().hidden = false; });
+  document.addEventListener('ens:step-release', () => { const note = $('cv-pause-note'); if (note) note.hidden = true; });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-cv-next-turn]')) $('next-turn')?.click();
+    else if (e.target.closest('[data-cv-open-console]')) go({ view: 'console' });
+  });
+
   window.ENSConsole = Object.freeze({ turnsHtml, afterRender, navigate });
   renderConsole(); // initialise from current state; ens:ui-ready may already have fired
 })();

@@ -62,3 +62,13 @@
 
 #trail .cv-selected { background: #e3edf1; color: #1d4b5c; box-shadow: 0 0 0 2px var(--cv-green, #1e5947); }
 
+
+/* R10-5d: a run held by Step through says so in the walkthrough. */
+.cv-pause-note {
+  display: flex; flex-wrap: wrap; gap: .5rem .8rem; align-items: center; justify-content: space-between;
+  margin: .7rem 0; padding: .65rem .85rem; border-radius: 10px;
+  background: #e3edf1; color: #1d4b5c; font-size: .92rem;
+}
+.cv-pause-note[hidden] { display: none; }
+.cv-pause-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.cv-pause-note .cv-link { margin-top: 0; }
