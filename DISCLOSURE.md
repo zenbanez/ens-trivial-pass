@@ -31,8 +31,18 @@ fairness, the boundary is stated plainly.
 - This repository's entire codebase: the zero-dependency Node server,
   the Nine Gates user interface with the interactive Gate 9
   processing-locus decision, sighting extraction wiring, the minimal
-  Digital Twin view, teacher sign-off, contest handling, confidence
-  decay display, and the visible warrant-trail panel.
+   Digital Twin view, teacher sign-off, contest handling, heuristic-prior
+   decay display (labelled heuristic, not measured), and the visible
+   warrant-trail panel.
+ - The three-screen walkthrough interface (Teacher workspace, Guided
+   review, Agent Console page) and story shell, designed and built by
+   Sol during the hackathon; and the Agent Console technical layer
+   built by Subok on that design.
+ - Six AI-generated illustrations (paper-world hero, next step, and
+   four ENS-vision aspects) directed by the steward and integrated
+   during the hackathon; prompts, tool, and file hashes are recorded
+   in `ART-PROVENANCE.md`. They are presentation artwork, not evidence
+   or capability claims.
 - The deterministic LOCAL STUB extractor (labelled scaffolding, not a
   model) and the Meta Model API integration (Responses API,
   `MODEL_API_*` environment convention).
@@ -49,9 +59,10 @@ fairness, the boundary is stated plainly.
   is supplied (environment only, never committed). No other third-party
   code: the server and client are dependency-free.
 - **AI assistance:** this implementation was written with AI coding
-  assistance (Muse Wonder, in the OpenCode harness), directed and
-  reviewed by the human steward, Zen Bañez, who is accountable for the
-  submission. ENS source material itself arose in human–AI dialogue, as
+  assistance (Muse Wonder leading integration, Sol on UI/screens,
+  Subok on the Agent Console and verification, zen4 on the demo
+  narrative and filming board), directed and reviewed by the human
+  steward, Zen Bañez, who is accountable for the submission. ENS source material itself arose in human–AI dialogue, as
   disclosed above.
 
 ## Data
