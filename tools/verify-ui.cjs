@@ -37,6 +37,7 @@ async function freePort() {
     await page.waitForFunction(()=>window.ensUI && window.ensManual && ensUI.snapshot().crumbs.length>0);
     assert.equal(await page.locator('#ens-view-intro').isVisible(),true);
     const original=await page.evaluate(()=>ensUI.snapshot());
+    if(process.env.ENS_EXPECT_CONSOLE)assert.equal(await page.evaluate(()=>Boolean(window.ENSConsole && window.ENSLiveness)),true,'expected actual D018 modules, not missing-file fallback');
     assert.equal(original.claims.length,0);
     assert.equal(localAttempts,0,'opening does not invoke extraction');
     await page.evaluate(()=>{location.hash='%E0%A4%A';});
@@ -56,6 +57,10 @@ async function freePort() {
     assert.equal(localAttempts,1,'one intentional stub-producing stand-in response');
     let state=await page.evaluate(()=>ensUI.snapshot());
     assert.ok(state.claims.every(c=>c.extractor.includes('LOCAL STUB')),'stub honestly labelled');
+    if(process.env.ENS_EXPECT_CONSOLE){
+      assert.match(await page.locator('#ens-source-status').innerText(),/LOCAL STUB · not a model/);
+      assert.match(await page.locator('[data-ens-liveness-source]').first().innerText(),/LOCAL STUB · not a model/);
+    }
     assert.equal(state.sessionId,original.sessionId);
     await page.locator('[data-review-step="3"]').click();
     const first=state.claims[0];
@@ -64,6 +69,11 @@ async function freePort() {
     const admitted=await page.evaluate(()=>ensUI.snapshot());
     await page.locator(`[data-claim-card="${first.id}"] [data-ens-record-link]`).click();
     await page.locator('#ens-view-console').waitFor({state:'visible'});
+    if(process.env.ENS_EXPECT_CONSOLE){
+      await page.locator('#cv-band').waitFor({state:'visible'});
+      assert.match(await page.locator('#cv-band').innerText(),/LOCAL STUB · not a model/);
+      assert.doesNotMatch(await page.locator('#cv-band').innerText(),/LIVE · local/);
+    }
     assert.equal(await page.locator('#trail').count(),1,'one actual trail node');
     assert.equal(await page.locator('#ens-console-trail #trail-panel').isVisible(),true);
     assert.equal(await page.locator(`[data-crumb-id="${first.crumb}"]`).isVisible(),true);
@@ -80,6 +90,7 @@ async function freePort() {
     await page.locator('#manual-learner').selectOption('Ben (SYNTHETIC)');
     await page.locator('#manual-btn').click();
     await page.waitForFunction(()=>ensUI.snapshot().claims.length===4);
+    if(process.env.ENS_EXPECT_CONSOLE)assert.match(await page.locator('#ens-source-status').innerText(),/MANUAL ENTRY/);
     assert.equal(localAttempts,1,'manual path does not extract');
     assert.equal((await page.evaluate(()=>ensUI.snapshot())).claims.at(-1).extractor,'teacher (manual, model off)');
     await page.locator('#view-console').click();

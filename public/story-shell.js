@@ -27,15 +27,29 @@
     byId('ens-session-label').textContent = `Session ${state.sessionId}`;
     byId('ens-run-live').textContent = `Same live page session · ${state.claims.length} claim(s) · ${state.crumbs.length} crumb(s). Model execution is identified per output, not implied by this label.`;
     byId('ens-live-summary').textContent = `${proposed} proposed · ${signed} teacher-signed · ${state.claims.filter(c=>c.contested).length} contested · ${state.crumbs.length} session crumbs. Navigation does not run a model or reset these records.`;
+    const liveness=window.ENSLiveness;
+    const lastSource=liveness?.forSession(state.turns);
+    byId('ens-source-status').innerHTML=lastSource?`Latest evidence: ${liveness.pill(lastSource)}`:'';
     const text = byId('debrief').value.trim();
     byId('ens-source-preview').textContent = text.match(/[^.!?]+[.!?]+/)?.[0] || text || 'The current debrief is empty.';
     addRecordLinks(state);
   }
   function addRecordLinks(state) {
     document.querySelectorAll('[data-claim-card]').forEach(card=>{
-      if(card.querySelector('[data-ens-record-link]')) return;
       const claim = state.claims.find(c=>c.id===card.dataset.claimCard);
       if(!claim?.crumb) return;
+      const liveness=window.ENSLiveness;
+      if(liveness){
+        const labels=liveness.forClaim(claim);
+        const key=labels.source.text+'|'+(labels.judge?.text||'');
+        let row=card.querySelector('.ens-claim-liveness');
+        if(!row){row=document.createElement('div');row.className='ens-claim-liveness';card.prepend(row);}
+        if(row.dataset.labelKey!==key){
+          row.innerHTML=`<span>Evidence:</span><span data-ens-liveness-source>${liveness.pill(labels.source)}</span>${labels.judge?`<span>Advisory judge:</span>${liveness.pill(labels.judge)}`:''}`;
+          row.dataset.labelKey=key;
+        }
+      }
+      if(card.querySelector('[data-ens-record-link]')) return;
       const b=document.createElement('button'); b.type='button'; b.className='ens-record-link';
       b.dataset.ensRecordLink='console'; b.dataset.claimId=claim.id; b.dataset.warrantId=claim.crumb;
       b.textContent='Inspect this claim’s record in Agent Console →'; card.append(b);
@@ -114,6 +128,7 @@
   });
   window.addEventListener('hashchange',fromHash);
   byId('debrief').addEventListener('input',updateSummary);
+  document.addEventListener('ens:turn',updateSummary);
   const observer=new MutationObserver(updateSummary);
   [byId('twin'),byId('trail'),byId('turns')].forEach(el=>observer.observe(el,{childList:true,subtree:true}));
   // Read-only snapshots are copied from the live session, never restored or fed back as app state.
