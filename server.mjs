@@ -27,7 +27,7 @@ const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'muse-glimmer';
 // Calibration measured by the lead on the steward's hardware, 2026-10-29,
 // node judge/calibrate.mjs together (12 synthetic cases, 36 judgments):
-const CALIBRATION_SUMMARY = 'Measured on 12 synthetic cases (36 judgments): support agreed 11/12, attribution 12/12, needs-support 11/12; stated ~0.95 confidence was right 89-100% of the time by question. Enough to catch a plainly wrong judge, not enough to certify one.';
+const CALIBRATION_SUMMARY = 'Measured on 12 synthetic cases (36 judgments): support agreed 11/12, attribution 12/12, needs-support 11/12; stated ~0.95 probability was right 89-100% of the time by question. Enough to catch a plainly wrong judge, not enough to certify one.';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png' };
 

@@ -232,7 +232,7 @@ function claimCard(c, i) {
       <h4>${escapeHtml(c.learner)} — ${escapeHtml(c.class)} <small>[${escapeHtml(c.status)} · run ${c.run ?? 1}]</small></h4>
       <p>${escapeHtml(c.statement)}</p>
       <div class="meter"><i style="width:${Math.round(d * 100)}%"></i></div>
-      <p><small>Confidence ${c.confidence} at assertion → <strong>${d.toFixed(2)}</strong> after ${$('age').value} days (computed at read time — drag the slider)</small></p>
+      <p><small>Heuristic prior ${c.confidence} at assertion → <strong>${d.toFixed(2)}</strong> after ${$('age').value} days (not measured — drag the slider)</small></p>
       <blockquote>“${escapeHtml(c.quote)}”</blockquote>
       <p><small>Extractor: ${escapeHtml(c.extractor)} · quote verified in code (${escapeHtml(c.match || 'literal')} match) · quote ${escapeHtml((c.quoteHash || '').slice(0, 19))}… · statement ${escapeHtml((c.statementHash || '').slice(0, 19))}…<br>
       ${c.contested ? '<strong>CONTESTED</strong> — preserved, never deleted (WT-I07). ' : ''}</small></p>
@@ -448,7 +448,7 @@ async function runExtraction() {
   for (const s of finalVerifiedSightings) {
     const cl = claimFrom(s);
     const id = `claim_${SESSION_ID}_r${runNo}_${++CLAIM_SEQ}`;
-    const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; confidence ${cl.confidence}; awaits teacher sign-off`, {
+    const cc = await crumb('ens.claim.assert', id, `${cl.class} proposed from verified sighting evidence; heuristic prior ${cl.confidence}; awaits teacher sign-off`, {
       learner: s.learner, match: s.match, run: runNo,
       quote_hash: 'sha256:' + (await sha256Hex(s.quote)),
       statement_hash: 'sha256:' + (await sha256Hex(cl.statement)),
@@ -507,7 +507,7 @@ async function recordManualSighting() {
   const cl = claimFrom(s);
   const id = `claim_${SESSION_ID}_m${runNo}_${++MANUAL_SEQ}`;
   const cc = await crumb('ens.claim.assert', id,
-    `${cl.class} proposed from a manual, model-off sighting (teacher-authored); confidence ${cl.confidence}; awaits teacher sign-off`,
+    `${cl.class} proposed from a manual, model-off sighting (teacher-authored); heuristic prior ${cl.confidence}; awaits teacher sign-off`,
     { learner: s.learner, match: s.match, source: 'manual', run: runNo,
       quote_hash: 'sha256:' + (await sha256Hex(s.quote)),
       statement_hash: 'sha256:' + (await sha256Hex(cl.statement)) });
