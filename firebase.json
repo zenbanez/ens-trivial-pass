@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "ens-trivial-pass",
     "public": "public",
     "ignore": [
       "firebase.json",

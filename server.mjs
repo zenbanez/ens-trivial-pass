@@ -333,6 +333,6 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`ENS Trivial Pass demo at http://127.0.0.1:${PORT} (Meta API ${MODEL_API_KEY ? `configured: ${MODEL_API_MODEL} @ ${MODEL_API_BASE_URL}` : 'not configured — extraction runs local (Ollama Glimmer) or the labelled LOCAL STUB'})`);
 });
