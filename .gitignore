@@ -2,3 +2,4 @@
 node_modules/
 *.log
 trail-export.json
+.firebase/
