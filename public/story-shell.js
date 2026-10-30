@@ -93,7 +93,11 @@
     if((detail.warrantId || detail.claimId) && !window.ENSConsole)requestAnimationFrame(()=>selectRecord(detail));
     return true;
   }
-  function fromHash(){navigate(decodeURIComponent(location.hash.slice(1)) || 'idea');}
+  function fromHash(){
+    let target='idea';
+    try { target=decodeURIComponent(location.hash.slice(1)) || 'idea'; } catch { /* malformed fragments do not break the live session */ }
+    navigate(target);
+  }
   document.addEventListener('ens:navigate',event=>{
     const detail=event.detail || {}; navigate(detail.view || 'review',detail);
   });
