@@ -1,7 +1,12 @@
 // Test suite for D-009 / Plan P2: Ground-truth coverage and bounded retry loop.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { COVERAGE_THRESHOLD, GROUND_TRUTH_FIXTURES, scoreCoverage } from '../fixtures/ground-truth.mjs';
+
+// Repo root, so server-spawning integration tests run on any machine (not one path).
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('Ground-truth fixtures exist and are structurally valid', () => {
   assert.equal(typeof COVERAGE_THRESHOLD, 'number');
@@ -169,7 +174,7 @@ test('Server integration: POST /api/coverage endpoint', async () => {
   const { spawn } = await import('node:child_process');
   const testPort = 5174;
   const proc = spawn(process.execPath, ['server.mjs'], {
-    cwd: 'C:/Users/zenba/ens-trivial-pass',
+    cwd: repoRoot,
     env: { ...process.env, PORT: String(testPort) },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -234,7 +239,7 @@ test('Server integration: POST /api/local-extract with retry feedback and isolat
   const testPort = 5175;
   // Point OLLAMA_BASE_URL to an uncalled endpoint; we test Gate 9 and prompt/rejection behavior
   const proc = spawn(process.execPath, ['server.mjs'], {
-    cwd: 'C:/Users/zenba/ens-trivial-pass',
+    cwd: repoRoot,
     env: { ...process.env, PORT: String(testPort), OLLAMA_BASE_URL: 'http://127.0.0.1:59999' },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -312,7 +317,7 @@ test('P2-3: /api/coverage rejects non-string keys and scores server-verified sig
   const { spawn } = await import('node:child_process');
   const testPort = 5176;
   const proc = spawn(process.execPath, ['server.mjs'], {
-    cwd: 'C:/Users/zenba/ens-trivial-pass',
+    cwd: repoRoot,
     env: { ...process.env, PORT: String(testPort) },
     stdio: ['ignore', 'pipe', 'inherit'],
   });

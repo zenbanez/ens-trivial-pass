@@ -44,6 +44,14 @@ node server.mjs        # zero dependencies, Node >= 18
 # open http://127.0.0.1:4173
 ```
 
+Or with Docker (same synthetic demo, no keys needed):
+
+```bash
+docker build -t ens-trivial-pass .
+docker run -p 4173:4173 ens-trivial-pass
+# open http://127.0.0.1:4173
+```
+
 Three-minute judge path: read the held disposition (hosted is the default) →
 switch Gate 9 to the declared local locus → run extraction → contest a
 claim → walk the trail.
