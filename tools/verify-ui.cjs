@@ -39,6 +39,9 @@ async function freePort() {
     const original=await page.evaluate(()=>ensUI.snapshot());
     assert.equal(original.claims.length,0);
     assert.equal(localAttempts,0,'opening does not invoke extraction');
+    await page.evaluate(()=>{location.hash='%E0%A4%A';});
+    await page.waitForTimeout(30);
+    assert.equal((await page.evaluate(()=>ensUI.snapshot())).sessionId,original.sessionId,'malformed fragment preserves session');
     assert.equal(await page.locator('.ens-hero>img').evaluate(i=>i.complete&&i.naturalWidth>0),true);
     await page.getByRole('link',{name:'See one small part'}).click();
     await page.locator('[data-story="slice"]').waitFor({state:'visible'});
