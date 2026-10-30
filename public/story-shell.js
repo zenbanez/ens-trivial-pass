@@ -83,6 +83,7 @@
     updateSummary();
   }
   function navigate(target, detail={}) {
+    const previous=`${view}/${chapter}/${step}`;
     if(target==='console')view='console';
     else if(target==='review'){view='review'; if(Number.isInteger(detail.step))step=Math.max(0,Math.min(4,detail.step)); if(detail.claimId)step=3;}
     else if(chapters.has(target)){view='intro';chapter=target;}
@@ -91,6 +92,7 @@
     renderNavigation();
     if(view==='console' && typeof renderConsole==='function')renderConsole();
     if((detail.warrantId || detail.claimId) && !window.ENSConsole)requestAnimationFrame(()=>selectRecord(detail));
+    if(!detail.warrantId && !detail.claimId && previous!==`${view}/${chapter}/${step}`)requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'}));
     return true;
   }
   function fromHash(){

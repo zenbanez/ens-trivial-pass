@@ -96,7 +96,9 @@ async function freePort() {
       }
     }
     await page.setViewportSize({width:1360,height:1000});
+    await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
     await page.evaluate(()=>ensUI.navigate('idea'));
+    await page.waitForFunction(()=>window.scrollY===0);
     if(process.env.ENS_UI_SCREENSHOT_DIR){fs.mkdirSync(process.env.ENS_UI_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.ENS_UI_SCREENSHOT_DIR,'ens-d017-opening.png'),fullPage:true});}
     assert.deepEqual(errors,[],'no page script errors');assert.deepEqual(external,[],'no external network');
     console.log('PASS: PNG/MJS served correctly; no startup model call; HELD; labelled stub path; manual model-off; sign-off/contest; same session/claims/trail across views; bidirectional record links; real hash recomputation; desktop/mobile overflow; no script errors or external requests.');
