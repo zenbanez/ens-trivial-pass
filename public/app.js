@@ -90,6 +90,7 @@ async function crumb(action, target, note, extra = {}) {
   crumbs.push(c);
   lastCrumb = c.warrant_id;
   renderTrail();
+  document.dispatchEvent(new CustomEvent('ens:crumb', { detail: { warrantId: c.warrant_id } }));
   return c;
 }
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -170,14 +171,18 @@ function waitStep() {
   return new Promise((r) => { stepResolve = r; });
 }
 function turn(kind, title, detail, inspector) {
-  const t = { n: TURNS.length + 1, kind, title, detail, inspector: inspector || null, at: new Date().toISOString() };
-  TURNS.push(t); renderConsole(); return t;
+  // crumb: the newest trail entry when this turn ran (D-018 cross-link).
+  const t = { n: TURNS.length + 1, kind, title, detail, inspector: inspector || null, at: new Date().toISOString(), crumb: lastCrumb };
+  TURNS.push(t); renderConsole();
+  document.dispatchEvent(new CustomEvent('ens:turn', { detail: { n: t.n, warrantId: t.crumb } }));
+  return t;
 }
 function renderConsole() {
   if (!$('tools-list')) return;
+  const CV = window.ENSConsole; // D-018: the console view draws the turns and the session band when loaded
   $('tools-list').innerHTML = TOOLS.map(([sig, who, note]) =>
     `<div class="tool ${who === 'human' ? 'human' : ''}"><code>${escapeHtml(sig)}</code> <span class="st ${who === 'human' ? 'held' : 'open'}">${who}</span><br><small>${escapeHtml(note)}</small></div>`).join('');
-  $('turns').innerHTML = TURNS.length ? TURNS.map((t) => `
+  $('turns').innerHTML = CV ? CV.turnsHtml(TURNS) : TURNS.length ? TURNS.map((t) => `
     <div class="turn ${t.kind === 'HUMAN' ? 'human-turn' : ''}">
       <span class="chip ${t.kind === 'HUMAN' ? 'human' : ''}">${escapeHtml(t.kind)}</span>
       <strong> Turn ${t.n} — ${escapeHtml(t.title)}</strong><br><small>${escapeHtml(t.detail)}</small>
@@ -196,6 +201,7 @@ function renderConsole() {
   ];
   $('checklist').innerHTML = items.map(([name, st, by]) =>
     `<div class="check"><span class="st ${st}">${st.toUpperCase()}</span> <strong>${escapeHtml(name)}</strong><br><small>Settled by: ${escapeHtml(by)}</small></div>`).join('');
+  CV?.afterRender();
 }
 
 function renderGates() {
