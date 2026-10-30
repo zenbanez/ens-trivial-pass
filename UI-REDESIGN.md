@@ -136,3 +136,24 @@ D-018 verification, security/accessibility certification, or readiness closure.
 Known limits of the prior candidate remain unless separately disposed. In
 particular, navigation does not make a selected local label into enforced
 containment or a crumb-metadata hash check into full payload verification.
+
+## Approved closing-art follow-up (30 October)
+
+Zen requested and approved a companion Next step image plus one image for
+each of the four Vision headings, then directly authorized integration.
+This follow-up starts at integrated candidate `a9a65aa`; it does not replace
+that locked pin or confer submission/merge authority. Muse Wonder integrates.
+The Next step page pairs the new image with existing text, then retains the
+three proposed next steps. The Vision shows all four uncropped square images
+at desktop width, two columns at tablet width, and one on narrow screens.
+Existing wording, long-term-vision limits and the final line are retained.
+
+All five PNGs are local, lazy-loaded and asynchronously decoded, with intrinsic
+dimensions and descriptive alt text. They depict fictional people and a
+conceptual future, not learner records, model outputs or implemented capabilities.
+The PNG originals are byte-preserved, about 12 MB total; lazy loading avoids
+making the whole set a startup requirement. See [asset provenance and prompts](ART-PROVENANCE.md).
+No app.js, console/liveness, provider, judge, fixture, admission or trail logic
+changes. Served smoke additionally checks all asset URLs/MIME, actual decode,
+four exact headings/desktop columns, unchanged session and zero model calls
+on concluding-page navigation. Existing round-trip and responsive tests remain.
