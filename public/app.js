@@ -168,6 +168,8 @@ let stepResolve = null;
 function waitStep() {
   if (!$('step-mode')?.checked) return Promise.resolve();
   $('next-turn').disabled = false;
+  // D-018: say so wherever the presenter is; the console view shows the note.
+  document.dispatchEvent(new CustomEvent('ens:step-wait', { detail: { turn: TURNS.length } }));
   return new Promise((r) => { stepResolve = r; });
 }
 function turn(kind, title, detail, inspector) {
@@ -580,7 +582,7 @@ $('judge-btn')?.addEventListener('click', async () => {
   $('judge-btn').disabled = false;
   renderTwin(); renderConsole();
 });
-$('next-turn')?.addEventListener('click', () => { $('next-turn').disabled = true; stepResolve?.(); stepResolve = null; });
+$('next-turn')?.addEventListener('click', () => { $('next-turn').disabled = true; stepResolve?.(); stepResolve = null; document.dispatchEvent(new CustomEvent('ens:step-release')); });
 $('view-teacher')?.addEventListener('click', () => { $('console-panel').hidden = true; $('view-teacher').classList.add('on'); $('view-console').classList.remove('on'); });
 $('view-console')?.addEventListener('click', () => { $('console-panel').hidden = false; renderConsole(); $('view-console').classList.add('on'); $('view-teacher').classList.remove('on'); $('console-panel').scrollIntoView({ behavior: 'smooth' }); });
 
