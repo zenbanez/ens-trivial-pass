@@ -90,6 +90,7 @@ async function crumb(action, target, note, extra = {}) {
   crumbs.push(c);
   lastCrumb = c.warrant_id;
   renderTrail();
+  document.dispatchEvent(new CustomEvent('ens:crumb', { detail: { warrantId: c.warrant_id } }));
   return c;
 }
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -170,14 +171,18 @@ function waitStep() {
   return new Promise((r) => { stepResolve = r; });
 }
 function turn(kind, title, detail, inspector) {
-  const t = { n: TURNS.length + 1, kind, title, detail, inspector: inspector || null, at: new Date().toISOString() };
-  TURNS.push(t); renderConsole(); return t;
+  // crumb: the newest trail entry when this turn ran (D-018 cross-link).
+  const t = { n: TURNS.length + 1, kind, title, detail, inspector: inspector || null, at: new Date().toISOString(), crumb: lastCrumb };
+  TURNS.push(t); renderConsole();
+  document.dispatchEvent(new CustomEvent('ens:turn', { detail: { n: t.n, warrantId: t.crumb } }));
+  return t;
 }
 function renderConsole() {
   if (!$('tools-list')) return;
+  const CV = window.ENSConsole; // D-018: the console view draws turns, band and trail when loaded
   $('tools-list').innerHTML = TOOLS.map(([sig, who, note]) =>
     `<div class="tool ${who === 'human' ? 'human' : ''}"><code>${escapeHtml(sig)}</code> <span class="st ${who === 'human' ? 'held' : 'open'}">${who}</span><br><small>${escapeHtml(note)}</small></div>`).join('');
-  $('turns').innerHTML = TURNS.length ? TURNS.map((t) => `
+  $('turns').innerHTML = CV ? CV.turnsHtml(TURNS) : TURNS.length ? TURNS.map((t) => `
     <div class="turn ${t.kind === 'HUMAN' ? 'human-turn' : ''}">
       <span class="chip ${t.kind === 'HUMAN' ? 'human' : ''}">${escapeHtml(t.kind)}</span>
       <strong> Turn ${t.n} — ${escapeHtml(t.title)}</strong><br><small>${escapeHtml(t.detail)}</small>
@@ -196,6 +201,7 @@ function renderConsole() {
   ];
   $('checklist').innerHTML = items.map(([name, st, by]) =>
     `<div class="check"><span class="st ${st}">${st.toUpperCase()}</span> <strong>${escapeHtml(name)}</strong><br><small>Settled by: ${escapeHtml(by)}</small></div>`).join('');
+  CV?.afterRender();
 }
 
 function renderGates() {
@@ -233,6 +239,7 @@ function claimCard(c, i) {
         : `<p><small><strong>DecisionJudge</strong> (${escapeHtml(c.judgment.judge.adapter)}/${escapeHtml(c.judgment.judge.model)}, ${escapeHtml(c.judgment.judge.signal)}): support ${escapeHtml(c.judgment.answers.support?.answer || '?')} (p=${c.judgment.answers.support?.probabilities?.true ?? '—'}), attribution ${escapeHtml(c.judgment.answers.attribution?.answer || '?')}, route: ${escapeHtml(c.judgment.routing.flags.join('; ') || 'no flags')} · attention: ${escapeHtml(c.judgment.routing.attention)}</small></p>`) : ''}
       ${c.status === 'proposed' ? `<button data-signoff="${i}">Teacher sign-off — admit to Twin</button>` : ''}
       <button data-contest="${i}" ${c.contested ? 'disabled' : ''}>Contest this claim</button>
+      <button type="button" class="cv-open" data-open-console="${escapeHtml(c.id)}">Open in console ↗</button>
     </article>`;
 }
 
