@@ -156,10 +156,10 @@ const $ = (id) => document.getElementById(id);
 // --- Agent Console (D-008): turns over the same run state ---
 const TURNS = [];
 const TOOLS = [
-  ['channel_admit(locus)', 'model', 'Admit the capture channel only if all Nine Gates pass at the declared locus. Refused: hosted without declaration.'],
+  ['channel_admit(locus)', 'code', 'Deterministic, code not model: admit the capture channel only if all Nine Gates pass at the declared locus. Refused: hosted without declaration.'],
   ['evidence_extract(debrief)', 'model', 'Extract sightings from the debrief at the admitted locus. Cannot run before admission.'],
   ['evidence_verify(sightings)', 'code', 'Deterministic, code not model: learner whitelisted, quote verbatim and naming the learner, >=20 chars. The extractor cannot call or skip this.'],
-  ['claim_propose(sighting)', 'model', 'Propose a claim from a verified sighting. Enters nothing by itself.'],
+  ['claim_propose(sighting)', 'code', 'Deterministic, code not model: propose a claim from a verified sighting by fixed rules (claimFrom). Enters nothing by itself.'],
   ['claim_signoff(claim)', 'human', 'HUMAN ONLY. A teacher admits a proposed claim to the Twin. No model may call this.'],
   ['claim_contest(claim)', 'human', 'HUMAN ONLY. Mark a claim contested; preserved, never deleted.'],
   ['sighting_record(teacher, manual)', 'human', 'HUMAN ONLY, model off. Teacher writes a sighting by hand; verified under the teacher-authored posture and enters the same sign-off/trail pipeline. No model runs.'],

@@ -15,7 +15,14 @@
     escalated: { text: 'ESCALATED TO YOU', tone: 'warn', means: 'Sightings still failed the quote check after the retries. They wait for the teacher.' },
   };
 
-  const judgeFailed = (judgment) => Boolean(judgment && Object.values(judgment.answers || {}).some((a) => a?.failed));
+  // A judge answered only if every question it was asked came back usable:
+  // present, not failed, with a numeric probability. A missing, partial or
+  // unreadable record is a judge that did not answer, never a live one.
+  const JUDGE_QUESTIONS = ['support', 'attribution', 'needs_support'];
+  const judgeFailed = (judgment) => !judgment || !judgment.answers || JUDGE_QUESTIONS.some((q) => {
+    const a = judgment.answers[q];
+    return !a || a.failed || typeof a.probabilities?.true !== 'number';
+  });
 
   /** The label for one console turn, read from what the turn recorded. */
   function forTurn(t) {
