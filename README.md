@@ -20,6 +20,8 @@ The ENS design and ZenOS collaboration foundations predate the event;
 this repository's implementation was created from **27 October 2026 onward**
 during the hackathon. See [previous work and team disclosure](DISCLOSURE.md).
 
+
+
 ## Try the demo
 
 | Access | Status |
@@ -81,7 +83,15 @@ or exercise the labelled stub fallback. Opening the page alone does not start
 extraction. If a configured local Ollama model is reachable, selecting local
 and running extraction invokes that model even without a hosted API key.
 
+The declared local locus calls a local [Ollama](https://ollama.com) at
+`http://127.0.0.1:11434` running `muse-glimmer` (override with
+`OLLAMA_BASE_URL` and `OLLAMA_MODEL`). If that model is unavailable, the
+run falls back to a deterministic **LOCAL STUB — not a model**, labelled as
+such in the UI and in every crumb, and the advisory judge is unavailable.
+
 Or build and run the same application with Docker:
+```
+
 
 ```bash
 docker build -t ens-trivial-pass .
@@ -109,22 +119,53 @@ operator review of endpoint access and model-call controls. Do not use real data
 the same browser state. The console labels code, model and human turns rather
 than presenting every step as AI reasoning.
 
-### Model paths and configuration
+## Meta models: what runs, and what does not
 
-| Path | Configuration and actual behavior |
-|---|---|
-| Declared local extraction | Server uses `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`) and `OLLAMA_MODEL` (default `muse-glimmer`). The repository does not install those weights. |
-| Local extraction fallback | If the local request fails, the browser uses the deterministic **LOCAL STUB**, explicitly labelled. This is not Meta inference. |
-| Local advisory judge | Ollama adapter; `OLLAMA_JUDGE_MODEL` falls back to `OLLAMA_MODEL`, then `muse-glimmer`. The same default model is used for extraction and judging, so this is **not an independent second opinion**. See [judge interface and calibration](judge/README.md). |
-| Hosted synthetic extraction | Separate, optional route. Requires server-side `HOSTED_SYNTHETIC_AUTHORIZED=1` **and** `MODEL_API_KEY`, supplied through the process environment, plus selection of the hosted-synthetic UI option. Failure is reported; this mode does not silently fall back. |
+| Leg | Model | Status in this submission |
+|---|---|---|
+| Sighting extraction at the declared local locus | Muse Glimmer (open weights) via local Ollama | Demonstrated |
+| Advisory DecisionJudge | the same local Muse Glimmer | Demonstrated |
+| Jev adapter for the judge | — | Seam only: not wired, never called |
+| Hosted extraction, synthetic only | Meta Model API, `muse-spark-1.3` | Implemented, not exercised for this submission |
 
-For the optional hosted path, `MODEL_API_BASE_URL` defaults to
-`https://api.meta.ai/v1` and `MODEL_API_MODEL` to `muse-spark-1.3`;
-the server calls `/responses`. Supplying a key alone does not authorize a
-hosted call, and the declared-local path does not use this hosted extractor.
-Hosted-synthetic sends the synthetic debrief to the configured provider;
-it is **not** Gate 9 compliance for real learner data.
-Never commit keys, put them in browser code, or use real learner text.
+**Local extraction.** The extractor runs at temperature 0. The Agent
+Console shows the exact prompt sent and the raw model output, before code
+verifies it. Code returns rejected sightings to the extractor with their
+reasons verbatim, at most twice, and then escalates to the teacher.
+Coverage is scored in code against ground-truth fixtures the extractor
+never sees; the threshold, two of three expected sightings, is shown on
+screen.
+
+**The DecisionJudge is advisory: a local Glimmer model answers three yes/no
+questions about each proposed claim, code routes the answers to the
+teacher's attention, and nothing it says admits, rejects, signs or blocks a
+claim.** It runs only at the declared local locus. The judge and the
+extractor are the same model, so they can share blind spots: their
+agreement is not independent confirmation. The probabilities are the
+model's own, self-reported and uncalibrated. A committed calibration record
+([evaluation/](evaluation/)) covers 12 synthetic cases (36 judgments):
+enough to catch a plainly wrong judge, not to certify one. The judge is an
+advisory harness with a structured-question interface, not a System One model;
+see [judge/README.md](judge/README.md).
+
+**Jev.** The judge's adapter interface has a Jev slot, but it refuses every
+call: Jev is not wired, and no Jev call has been made from this repository.
+
+**Hosted extraction** uses the Responses API (the
+`meta-models/legal-agent-workshop` convention: an OpenAI-compatible client
+pointed at `api.meta.ai`). It needs both a key, supplied **via environment
+only** (never committed), and the operator's authorization on the server:
+
+```bash
+MODEL_API_KEY=... HOSTED_SYNTHETIC_AUTHORIZED=1 node server.mjs
+# optional: MODEL_API_BASE_URL (default https://api.meta.ai/v1),
+#           MODEL_API_MODEL  (default muse-spark-1.3)
+```
+
+Without both, the hosted-synthetic option refuses. A client's claim of
+admission is not enough. The Gate 9 held disposition fires *before* any
+hosted call would be made. Hosted runs take one attempt, with no retry
+loop.
 
 Local execution depends on the operator's configured endpoints. A model name
 and a selected local label are not proof of pinned weight bytes, blocked
@@ -172,19 +213,8 @@ directions, not four delivered products.
 ENS remains candidate research under governed validation. No educational
 effectiveness, institutional adoption, DepEd representation, legal compliance,
 or readiness for use with real learners is claimed.
-
-## Inspect and reproduce
-
-```bash
-node --test test/*.test.mjs
-node tools/verify-shared-labels.cjs
 ```
 
-These commands exercise deterministic logic, fixtures and mocked transports;
-they do not prove a live model ran. [CI](.github/workflows/ci.yml) runs the Node
-test suites. The optional served-browser smoke test requires Playwright and
-an installed compatible browser; it is a development dependency, not an app
-runtime requirement:
 
 ```bash
 # With Playwright available to Node and Edge installed:
@@ -204,6 +234,19 @@ and tests desktop/mobile layouts. See [UI contract](UI-REDESIGN.md).
 | [fixtures/ground-truth.mjs](fixtures/ground-truth.mjs) | Synthetic evidence and bounded coverage fixtures |
 | [UI-REDESIGN.md](UI-REDESIGN.md) | Same-session UI contract and presentation boundaries |
 | [ART-PROVENANCE.md](ART-PROVENANCE.md) | Generated-art prompts, tool attribution and file hashes |
+
+- `node --test test/*.test.mjs` runs 41 unit tests, covering the
+  coverage scorer and retry loop, the DecisionJudge, and manual entry.
+  GitHub Actions runs them on every pull request and on pushes to `main`,
+  on Node 20, 22 and 24.
+- `tools/verify-ui.cjs` and `tools/verify-shared-labels.cjs` drive the page
+  in a browser. They need Playwright, installed separately, and are not
+  part of CI.
+- The layout: `server.mjs` (one zero-dependency Node server), `public/`
+  (the page), `judge/` (the DecisionJudge and its adapters), `fixtures/`
+  (ground truth and calibration cases), `test/`, `tools/`.
+```
+
 
 ## Provenance, collaborators and license
 
