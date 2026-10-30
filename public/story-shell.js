@@ -103,6 +103,10 @@
     else if(chapters.has(target)){view='intro';chapter=target;}
     else if(panelIds.includes(target)){view='review';step=panelIds.indexOf(target);}
     else return false;
+    // Keep button/event navigation and native fragment links on the same route.
+    // Otherwise returning to an already-current hash emits no hashchange.
+    const route=view==='intro'?chapter:view==='review'?panelIds[step]:'console';
+    if(location.hash!==`#${route}`)history.replaceState(null,'',`#${route}`);
     renderNavigation();
     if(view==='console' && typeof renderConsole==='function')renderConsole();
     if((detail.warrantId || detail.claimId) && !window.ENSConsole)requestAnimationFrame(()=>selectRecord(detail));

@@ -37,6 +37,22 @@ async function freePort() {
     await page.waitForFunction(()=>window.ensUI && window.ensManual && ensUI.snapshot().crumbs.length>0);
     assert.equal(await page.locator('#ens-view-intro').isVisible(),true);
     const original=await page.evaluate(()=>ensUI.snapshot());
+    // Peer-reported round-trip: a button must not leave a stale target hash.
+    await page.evaluate(()=>{location.hash='twin-panel';});
+    await page.locator('#twin-panel').waitFor({state:'visible'});
+    for(let round=0;round<2;round++){
+      await page.locator('#view-console').click();
+      await page.locator('#ens-view-console').waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>location.hash),'#console');
+      await page.getByRole('link',{name:'← Return to teacher review',exact:true}).click();
+      await page.locator('#twin-panel').waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>location.hash),'#twin-panel');
+    }
+    assert.deepEqual(await page.evaluate(()=>ensUI.snapshot()),original,'route round-trip never mutates session');
+    for(const [index,id] of ['debrief-panel','gate-panel','manual-panel','twin-panel','trail-panel'].entries()){
+      assert.match(await page.locator(`#${id} h2`).innerText(),new RegExp(`^${index+1} · `),'panel numbering matches walkthrough');
+    }
+    await page.evaluate(()=>ensUI.navigate('idea'));
     if(process.env.ENS_EXPECT_CONSOLE)assert.equal(await page.evaluate(()=>Boolean(window.ENSConsole && window.ENSLiveness)),true,'expected actual D018 modules, not missing-file fallback');
     assert.equal(original.claims.length,0);
     assert.equal(localAttempts,0,'opening does not invoke extraction');
