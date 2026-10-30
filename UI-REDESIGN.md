@@ -144,9 +144,9 @@ each of the four Vision headings, then directly authorized integration.
 This follow-up starts at integrated candidate `a9a65aa`; it does not replace
 that locked pin or confer submission/merge authority. Muse Wonder integrates.
 The Next step page pairs the new image with existing text, then retains the
-three proposed next steps. The Vision shows all four uncropped square images
-at desktop width, two columns at tablet width, and one on narrow screens.
-Existing wording, long-term-vision limits and the final line are retained.
+three proposed next steps. The initial four-across Vision arrangement is
+superseded by the approved alternating journey below. Existing wording,
+long-term-vision limits and the final line are retained.
 
 All five PNGs are local, lazy-loaded and asynchronously decoded, with intrinsic
 dimensions and descriptive alt text. They depict fictional people and a
@@ -155,5 +155,27 @@ The PNG originals are byte-preserved, about 12 MB total; lazy loading avoids
 making the whole set a startup requirement. See [asset provenance and prompts](ART-PROVENANCE.md).
 No app.js, console/liveness, provider, judge, fixture, admission or trail logic
 changes. Served smoke additionally checks all asset URLs/MIME, actual decode,
-four exact headings/desktop columns, unchanged session and zero model calls
+four exact headings, unchanged session and zero model calls
 on concluding-page navigation. Existing round-trip and responsive tests remain.
+
+### Vision journey continuation (30 October)
+
+Zen directly approved the lead-relayed request to replace the four-card grid
+with four alternating feature sections: copy left/image right, then image
+left/copy right, repeated. This continuation is based on integrated
+`de73a91`, retaining the downstream disclosure, pause and heuristic-prior
+wording changes. No image bytes, narrative copy, runtime code or DISCLOSURE.md
+are changed. No new PNGs or external dependencies.
+
+A static inline SVG in paper tones threads the sections toward the centered
+finale. It is hidden from assistive technology, not focusable, non-interactive,
+and behind opaque text/image surfaces so it does not carry meaning or obscure
+reading. There is no animation or motion dependency. Mobile retains the same
+semantic section order and puts each heading/copy before its uncropped image.
+
+The served smoke asserts four named sections, decorative/non-interactive SVG,
+unchanged SHA-256 hashes for all four approved images, alternating image sides
+at 1360/1024px, copy-before-image stacking at 390/320px, no overflow and the
+existing same-session/console contracts. Local screenshots are author QA,
+not film-readiness acceptance. Muse Wonder reviews, assembles and opens PRs;
+the filming board remains zen4's lane and is not revised by this change.

@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process');
 const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs');
+const { createHash } = require('node:crypto');
 const repo = path.resolve(__dirname, '..');
 const pause = ms => new Promise(r=>setTimeout(r,ms));
 async function freePort() {
@@ -48,8 +49,20 @@ async function freePort() {
       await page.locator('[data-story="'+target+'"] img').evaluateAll(images=>Promise.all(images.map(i=>i.decode())));
       assert.equal(await page.locator('[data-story="'+target+'"] img').evaluateAll(images=>images.every(i=>i.naturalWidth>0&&i.alt.length>20)),true,'closing art loaded with descriptions');
     }
-    assert.deepEqual(await page.locator('.ens-vision-grid h2').allTextContents(),['Empowered Teachers','Involved Parents','Guided Learners','Learning Institutions']);
-    assert.equal(await page.locator('.ens-vision-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),4,'desktop closing shows all four aspects together');
+    assert.deepEqual(await page.locator('.ens-vision-feature h2').allTextContents(),['Empowered Teachers','Involved Parents','Guided Learners','Learning Institutions']);
+    assert.equal(await page.locator('.ens-vision-feature').count(),4);
+    const road=page.locator('.ens-vision-road');
+    assert.equal(await road.getAttribute('aria-hidden'),'true','road is decorative');
+    assert.equal(await road.getAttribute('focusable'),'false','road cannot take focus');
+    assert.equal(await road.evaluate(e=>getComputedStyle(e).pointerEvents),'none','road cannot intercept interaction');
+    assert.equal(await road.locator('script,foreignObject,a,[href]').count(),0,'inline road has no executable or external content');
+    const imageHashes={
+      'empowered-teachers':'c7a85bba8f8e4da68ba82bdf8e38eb8bea108b4b1d23e48804ece06fa91634f5',
+      'involved-parents':'0300ec4b94c57a1c5c05b09839a5ac907d26adf20b7c5c57650b57870e83d259',
+      'guided-learners':'901fc7f8d581b203b5c20c7bd47a51c01e8e2aba3ddd5e91388d5f87551c7a2f',
+      'learning-institutions':'0772dfed3ae9486b0bc3c04113f7b054bdeca9894d5f17194833586be9173d4a'
+    };
+    for(const [name,expected] of Object.entries(imageHashes))assert.equal(createHash('sha256').update(fs.readFileSync(path.join(repo,'public/assets/ens-vision-'+name+'.png'))).digest('hex'),expected,'approved image unchanged: '+name);
     assert.deepEqual(await page.evaluate(()=>ensUI.snapshot()),original,'artwork navigation leaves runtime unchanged');
     assert.equal(localAttempts,0,'closing art never starts extraction');
     await page.evaluate(()=>ensUI.navigate('idea'));
@@ -133,10 +146,18 @@ async function freePort() {
       await page.setViewportSize({width,height:1100});
       for(const target of ['idea','slice','next','vision','debrief-panel','gate-panel','manual-panel','twin-panel','trail-panel','console']){
         await page.evaluate(t=>ensUI.navigate(t),target);
+        if(target==='vision'){
+          const ordered=await page.locator('.ens-vision-feature').evaluateAll((rows,wide)=>rows.every((row,index)=>{
+            const copy=row.querySelector('.ens-vision-copy').getBoundingClientRect();
+            const image=row.querySelector('figure').getBoundingClientRect();
+            return wide?(index%2?image.right<=copy.left+2:copy.right<=image.left+2):copy.bottom<=image.top+2;
+          }),width>740);
+          assert.equal(ordered,true,'Vision alternates desktop image sides and keeps copy before image on mobile '+width);
+        }
         if(process.env.ENS_UI_SCREENSHOT_DIR && ((width===1360&&(target==='next'||target==='vision'))||(width===390&&target==='vision'))){
           fs.mkdirSync(process.env.ENS_UI_SCREENSHOT_DIR,{recursive:true});
           await page.locator('[data-story="'+target+'"] img').evaluateAll(images=>Promise.all(images.map(i=>i.decode())));
-          await page.screenshot({path:path.join(process.env.ENS_UI_SCREENSHOT_DIR,'ens-closing-'+target+'-'+width+'.png'),fullPage:true});
+          await page.screenshot({path:path.join(process.env.ENS_UI_SCREENSHOT_DIR,(target==='vision'?'ens-vision-journey':'ens-closing-next')+'-'+width+'.png'),fullPage:true});
         }
         const over=await page.evaluate(()=>({root:document.documentElement.scrollWidth>innerWidth+2,leaves:[...document.querySelectorAll('h1,h2,h3,p,pre,button,textarea,select')].filter(e=>e.getClientRects().length&&e.scrollWidth>e.clientWidth+3).map(e=>e.id||e.tagName)}));
         if(over.root) console.log('Overflow detail',await page.evaluate(()=>[...document.body.querySelectorAll('*')].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().right>innerWidth+2).map(e=>({id:e.id,tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).slice(0,20)));
