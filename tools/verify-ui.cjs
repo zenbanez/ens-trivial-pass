@@ -37,6 +37,22 @@ async function freePort() {
     await page.waitForFunction(()=>window.ensUI && window.ensManual && ensUI.snapshot().crumbs.length>0);
     assert.equal(await page.locator('#ens-view-intro').isVisible(),true);
     const original=await page.evaluate(()=>ensUI.snapshot());
+    const closingAssets=['ens-next-step.png','ens-vision-empowered-teachers.png','ens-vision-involved-parents.png','ens-vision-guided-learners.png','ens-vision-learning-institutions.png'];
+    for(const asset of closingAssets){
+      const response=await fetch(base+'/assets/'+asset);
+      assert.equal(response.status,200,asset+' served');
+      assert.match(response.headers.get('content-type'),/^image\/png/);
+    }
+    for(const target of ['next','vision']){
+      await page.evaluate(t=>ensUI.navigate(t),target);
+      await page.locator('[data-story="'+target+'"] img').evaluateAll(images=>Promise.all(images.map(i=>i.decode())));
+      assert.equal(await page.locator('[data-story="'+target+'"] img').evaluateAll(images=>images.every(i=>i.naturalWidth>0&&i.alt.length>20)),true,'closing art loaded with descriptions');
+    }
+    assert.deepEqual(await page.locator('.ens-vision-grid h2').allTextContents(),['Empowered Teachers','Involved Parents','Guided Learners','Learning Institutions']);
+    assert.equal(await page.locator('.ens-vision-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),4,'desktop closing shows all four aspects together');
+    assert.deepEqual(await page.evaluate(()=>ensUI.snapshot()),original,'artwork navigation leaves runtime unchanged');
+    assert.equal(localAttempts,0,'closing art never starts extraction');
+    await page.evaluate(()=>ensUI.navigate('idea'));
     // Peer-reported round-trip: a button must not leave a stale target hash.
     await page.evaluate(()=>{location.hash='twin-panel';});
     await page.locator('#twin-panel').waitFor({state:'visible'});
@@ -117,6 +133,11 @@ async function freePort() {
       await page.setViewportSize({width,height:1100});
       for(const target of ['idea','slice','next','vision','debrief-panel','gate-panel','manual-panel','twin-panel','trail-panel','console']){
         await page.evaluate(t=>ensUI.navigate(t),target);
+        if(process.env.ENS_UI_SCREENSHOT_DIR && ((width===1360&&(target==='next'||target==='vision'))||(width===390&&target==='vision'))){
+          fs.mkdirSync(process.env.ENS_UI_SCREENSHOT_DIR,{recursive:true});
+          await page.locator('[data-story="'+target+'"] img').evaluateAll(images=>Promise.all(images.map(i=>i.decode())));
+          await page.screenshot({path:path.join(process.env.ENS_UI_SCREENSHOT_DIR,'ens-closing-'+target+'-'+width+'.png'),fullPage:true});
+        }
         const over=await page.evaluate(()=>({root:document.documentElement.scrollWidth>innerWidth+2,leaves:[...document.querySelectorAll('h1,h2,h3,p,pre,button,textarea,select')].filter(e=>e.getClientRects().length&&e.scrollWidth>e.clientWidth+3).map(e=>e.id||e.tagName)}));
         if(over.root) console.log('Overflow detail',await page.evaluate(()=>[...document.body.querySelectorAll('*')].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().right>innerWidth+2).map(e=>({id:e.id,tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).slice(0,20)));
         assert.deepEqual(over,{root:false,leaves:[]},`overflow ${width}/${target}`);
