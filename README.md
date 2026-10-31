@@ -27,7 +27,7 @@ during the hackathon. See [previous work and team disclosure](DISCLOSURE.md).
 | Access | Status |
 |---|---|
 | Local application | Available: [run with Node or Docker](#run-locally), then open http://127.0.0.1:4173 |
-| Public hosted deployment | Live: https://ens-trivial-pass--zenos-deped-ld.asia-southeast1.hosted.app/ (Firebase App Hosting, full stack, verified 2026-10-30: config honest with no key, extraction degrades to the labelled LOCAL STUB without Ollama). No Meta key is deployed; the hosted-synthetic route refuses without one. |
+| Public hosted deployment | Live: https://ens.banezglobal.com/ (Firebase App Hosting, full stack, verified: config honest with no key, extraction degrades to the labelled LOCAL STUB without Ollama). No Meta key is deployed; the hosted-synthetic route refuses without one. |
 | Recorded video walkthrough | **Pending filming and publication.** No completed video URL is published here yet. |
 
 These pending entries are status slots, not finished deliverables. The lead
