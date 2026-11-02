@@ -110,6 +110,7 @@ const LEARNER_NAMES = new Set(LEARNERS.map((l) => l.name));
 let CLAIM_SEQ = 0;
 let RUN_SEQ = 0;
 let TRAIL_VERIFIED = null; // null until the Verify-trail check actually runs (D-004 P1-1)
+let TRAIL_VERIFIED_COUNT = null; // how many crumbs the last Verify-trail check recomputed (D-025, scope §4a)
 const SESSION_ID = randHex(3); // trails exported from two sessions cannot collide (D-004 round 3)
 function verifyQuotes(sightings, text) {
   const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -152,6 +153,7 @@ const TOOLS = [
   ['claim_signoff(claim)', 'human', 'HUMAN ONLY. A teacher admits a proposed claim to the Twin. No model may call this.'],
   ['claim_contest(claim)', 'human', 'HUMAN ONLY. Mark a claim contested; preserved, never deleted.'],
   ['sighting_record(teacher, manual)', 'human', 'HUMAN ONLY, model off. Teacher writes a sighting by hand; verified under the teacher-authored posture and enters the same sign-off/trail pipeline. No model runs.'],
+  ['next_step_record(claim)', 'human', 'HUMAN ONLY. The teacher records their own next step for a signed claim. No model may call this.'],
 ];
 let stepResolve = null;
 function waitStep() {
@@ -188,6 +190,7 @@ function renderConsole() {
     ['Sightings verified', SIGHTINGS.length ? 'done' : 'open', `${SIGHTINGS.length} verified sighting(s) in code`],
     ['Extraction coverage', COVERAGE_REPORT ? (COVERAGE_REPORT.passed ? 'done' : 'open') : 'open', COVERAGE_REPORT ? `${COVERAGE_REPORT.covered}/${COVERAGE_REPORT.total} (${COVERAGE_REPORT.percentage}%) — threshold ≥${COVERAGE_REPORT.thresholdPercentage}%` : 'Awaiting extraction'],
     ['Claims signed into Twin', CLAIMS.some((c) => c.status === 'signed') ? 'done' : 'open', `${CLAIMS.filter((c) => c.status === 'signed').length}/${CLAIMS.length} signed`],
+    ['Next steps recorded', CLAIMS.some((c) => c.status === 'signed' && window.ensNavigation?.currentStep(c.id, crumbs)) ? 'done' : 'open', `${CLAIMS.filter((c) => c.status === 'signed' && window.ensNavigation?.currentStep(c.id, crumbs)).length}/${CLAIMS.filter((c) => c.status === 'signed').length} signed`],
     ['Trail recomputes', TRAIL_VERIFIED === null ? 'open' : TRAIL_VERIFIED ? 'done' : 'held', TRAIL_VERIFIED === null ? 'not yet recomputed — use Verify trail' : TRAIL_VERIFIED ? 'every crumb hash recomputed in browser' : 'RECOMPUTATION FAILED — trail altered'],
   ];
   $('checklist').innerHTML = items.map(([name, st, by]) =>
@@ -264,6 +267,7 @@ function renderTwin() {
     turn('HUMAN', `claim_signoff(${c.id})`, 'Human turn: teacher admits the claim to the Twin. No model may call this tool.', null);
     renderTwin(); renderConsole();
   }));
+  renderNavigationPage();
 }
 
 function renderTrail() {
@@ -490,12 +494,79 @@ async function recordManualSighting() {
   renderConsole();
 }
 
+// --- D-025: the Navigation page — the teacher's own next step ---
+// One card per signed claim. The teacher writes the next step by hand; it is
+// recorded as an ens.navigation.next_step crumb in the same trail. No model
+// runs and no request is made on this path. Revision appends a crumb naming
+// the one it supersedes. window.ensNavigation is the deferred ES module
+// (public/navigation.mjs).
+const NAV_EDITING = new Set();
+function renderNavigationPage() {
+  const N = window.ensNavigation;
+  if (!$('nav-cards') || !N) return;
+  const signed = CLAIMS.filter((c) => c.status === 'signed');
+  const proposed = CLAIMS.filter((c) => c.status === 'proposed').length;
+  $('nav-cards').innerHTML = signed.length ? signed.map((c) => {
+    const step = N.currentStep(c.id, crumbs);
+    const editing = !step || NAV_EDITING.has(c.id);
+    return `
+    <article class="claim nav-card ${c.contested ? 'contested' : ''}" data-nav-card="${escapeHtml(c.id)}">
+      <h4>${escapeHtml(c.learner)} — ${escapeHtml(c.class)} <small>[signed${c.contested ? ' · CONTESTED' : ''}]</small></h4>
+      <p>${escapeHtml(c.statement)}</p>
+      <blockquote>“${escapeHtml(c.quote)}”</blockquote>
+      <p><small>Source: ${escapeHtml(c.extractor)}${c.contested ? ' · <strong>CONTESTED</strong>: your next step can respond to that' : ''}</small>
+      <button type="button" class="ens-record-link" data-ens-record-link="review" data-claim-id="${escapeHtml(c.id)}" data-warrant-id="${escapeHtml(c.crumb)}">See the full claim →</button></p>
+      ${step ? `<div class="nav-step"><p><strong>Teacher's next step:</strong> ${escapeHtml(step.context.next_step)}</p>
+        <p><small>Recorded ${escapeHtml(step.issued_at)} · crumb <code>${escapeHtml(step.warrant_id)}</code>${step.context.supersedes ? ` · supersedes <code>${escapeHtml(step.context.supersedes)}</code>` : ''}</small></p>
+        ${editing ? '' : `<button type="button" data-nav-revise="${escapeHtml(c.id)}">Revise</button>`}</div>` : ''}
+      ${editing ? `<label class="nav-entry">In your own words: what will you try next with this learner?
+        <textarea rows="3" data-nav-text="${escapeHtml(c.id)}"></textarea></label>
+        <button type="button" data-nav-record="${escapeHtml(c.id)}">${step ? 'Record the revised step' : 'Record my next step'}</button>
+        <span class="note" data-nav-note="${escapeHtml(c.id)}"></span>` : ''}
+    </article>`;
+  }).join('') : '<p><em>No signed claims yet. Next steps follow the teacher’s sign-off, so sign a claim first. <a href="#twin-panel">Go to sign-off →</a></em></p>';
+  $('nav-pending').innerHTML = signed.length && proposed
+    ? `${proposed} proposed claim${proposed === 1 ? ' is' : 's are'} not signed yet. A next step follows a teacher’s sign-off. <a href="#twin-panel">Sign them in the walkthrough →</a>`
+    : '';
+}
+async function recordNextStep(claimId) {
+  const N = window.ensNavigation;
+  const c = CLAIMS.find((x) => x.id === claimId);
+  const note = document.querySelector(`[data-nav-note="${CSS.escape(claimId)}"]`);
+  if (!N || !c || !N.canRecord(c)) { if (note) note.textContent = 'Only a teacher-signed claim can carry a next step; nothing was recorded.'; return; }
+  const checked = N.validateNextStep(document.querySelector(`[data-nav-text="${CSS.escape(claimId)}"]`)?.value);
+  if (!checked.ok) { if (note) note.textContent = `Not recorded: ${checked.reason}.`; return; }
+  const prior = N.currentStep(c.id, crumbs);
+  const context = N.nextStepContext(c, checked.text, 'sha256:' + (await sha256Hex(checked.text)), prior?.warrant_id);
+  await crumb(N.NEXT_STEP_ACTION, c.id, prior
+    ? 'Teacher revises their own next step for this signed claim; the earlier step stays in the trail; model off, no suggestion shown'
+    : 'Teacher records their own next step for this signed claim; model off, no suggestion shown', context);
+  // Scope §4a (Sol's D-024 R1): an earlier verification must not present
+  // itself as covering this new record. Back to unchecked until re-verified.
+  if (TRAIL_VERIFIED !== null) {
+    TRAIL_VERIFIED = null;
+    $('verify-trail-result').textContent = N.staleVerifyNotice(TRAIL_VERIFIED_COUNT, crumbs.length);
+  }
+  turn('HUMAN', `next_step_record(${c.id})`, prior
+    ? 'Human turn: the teacher revises their own next step; the earlier step is preserved. No model ran.'
+    : 'Human turn: the teacher records their own next step for a signed claim. No model ran.', null);
+  NAV_EDITING.delete(c.id);
+  renderNavigationPage();
+  renderConsole();
+}
+
 // --- init ---
 $('learners').textContent = LEARNERS.map((l) => l.name).join(', ');
 // D-015: populate the manual-entry learner picker from the same whitelist.
 $('manual-learner').innerHTML = LEARNERS.map((l) =>
   `<option value="${l.name}">${escapeHtml(l.name)}</option>`).join('');
 $('manual-btn').addEventListener('click', recordManualSighting);
+$('nav-cards')?.addEventListener('click', (e) => {
+  const rec = e.target.closest('[data-nav-record]');
+  const rev = e.target.closest('[data-nav-revise]');
+  if (rec) recordNextStep(rec.dataset.navRecord);
+  else if (rev) { NAV_EDITING.add(rev.dataset.navRevise); renderNavigationPage(); }
+});
 $('debrief').value = SAMPLE;
 document.querySelectorAll('input[name=locus]').forEach((r) => r.addEventListener('change', renderGates));
 $('extract-btn').addEventListener('click', runExtraction);
@@ -513,6 +584,7 @@ $('verify-trail-btn')?.addEventListener('click', async () => {
     if (recomputed !== c.content_hash) bad++;
   }
   TRAIL_VERIFIED = bad === 0;
+  TRAIL_VERIFIED_COUNT = crumbs.length;
   $('verify-trail-result').textContent = bad
     ? `✗ ${bad}/${crumbs.length} crumb hash(es) DO NOT recompute. The trail has been altered since the crumbs were written.`
     : `✓ ${crumbs.length}/${crumbs.length} crumb hashes recompute in this browser. Change one byte of a quote, statement, or note and this check fails.`;

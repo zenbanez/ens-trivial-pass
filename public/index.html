@@ -16,7 +16,7 @@
 <nav class="ens-surfaces" aria-label="Application views"><a href="#idea" data-view-link="intro">Overview</a><button id="view-teacher" data-view-link="review">Guided walkthrough</button><button id="view-console" data-view-link="console">Agent Console</button></nav>
 </header>
 <div class="ens-disclosure"><strong>All learners and debriefs are synthetic.</strong> <span id="ens-run-live">Opening this page creates one demo session; navigation keeps that session.</span><span id="ens-source-status"></span><span class="ens-session" id="ens-session-label"></span></div>
-<nav class="ens-chapters" aria-label="Presentation sequence"><a href="#idea" data-route-link="idea">The idea</a><a href="#slice" data-route-link="slice">The slice</a><a href="#debrief-panel" data-route-link="review">The demo</a><a href="#console" data-route-link="console">Under the hood</a><a href="#next" data-route-link="next">The next step</a><a href="#vision" data-route-link="vision">The Vision</a></nav>
+<nav class="ens-chapters" aria-label="Presentation sequence"><a href="#idea" data-route-link="idea">The idea</a><a href="#slice" data-route-link="slice">The slice</a><a href="#debrief-panel" data-route-link="review">The demo</a><a href="#console" data-route-link="console">Under the hood</a><a href="#navigation" data-route-link="navigation">Navigation</a><a href="#next" data-route-link="next">The next step</a><a href="#vision" data-route-link="vision">The Vision</a></nav>
 <main id="ens-main">
 <div id="ens-view-intro" class="ens-view"><section class="ens-story" data-story="idea" aria-labelledby="ens-idea-title">
 <div class="ens-hero"><img src="assets/ens-paper-world.png" alt="A fictional teacher and two children at a paper-sculpture classroom table, with an open book unfolding into branching paths." width="1672" height="940" fetchpriority="high">
@@ -105,6 +105,11 @@
     </div>
   </section>
 <div id="ens-console-trail"></div>
+<div class="ens-after-demo"><a href="#trail-panel">Inspect the trail with the teacher →</a><a class="ens-button ens-primary" href="#navigation">Decide the next step →</a></div>
+</div>
+<div id="ens-view-navigation" class="ens-view" hidden>
+<div class="ens-page-heading"><div><p class="ens-eyebrow">Navigation / the teacher’s next step</p><h1>What will I do <em>tomorrow?</em></h1><p>A signed claim is not the end of the story. For each one, write down what you will try next with this learner. It joins the same trail as everything else in this session.</p><p class="ens-nav-limiter" id="nav-limiter"><strong>The teacher’s decision, not a model recommendation.</strong> No model runs on this page. ENS’s navigation engine is not built in this slice; this page records the teacher’s own choice, nothing more.</p></div><a class="ens-text-link" href="#console">← Back to the Agent Console</a></div>
+<section id="navigation-panel"><div id="nav-cards"></div><p class="note" id="nav-pending"></p><p class="ens-small">Recorded, not assessed: a next step is not a grade, a placement, or a plan the system checks.</p></section>
 <div class="ens-after-demo"><a href="#trail-panel">Inspect the trail with the teacher →</a><a class="ens-button ens-primary" href="#next">Where does this go next? →</a></div>
 </div>
 </main>
@@ -112,6 +117,7 @@
 <script src="app.js"></script>
 <script src="liveness.js"></script>
 <script type="module" src="manual-sighting.mjs"></script>
+<script type="module" src="navigation.mjs"></script>
 <script src="story-shell.js"></script>
 <script src="console-view.js"></script>
 </body>

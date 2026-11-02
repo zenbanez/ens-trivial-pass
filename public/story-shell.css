@@ -131,4 +131,12 @@ body.ens-app { max-width:none; padding:0; margin:0; font:16px/1.55 system-ui,san
  .ens-app .claim { padding:16px; } .ens-app #trail { padding-left:12px; margin-left:0; }
  .ens-app .crumb::before { display:none; } .ens-app .crumb { padding:10px 4px; }
 }
+/* D-025: Navigation — the teacher's next step. The limiter stays beside the heading. */
+.ens-app .ens-nav-limiter { border-left:3px solid var(--ens-ochre); background:var(--ens-sage); padding:10px 14px; font-family:system-ui,sans-serif; font-size:14px; max-width:62ch; }
+.ens-app #navigation-panel { margin-top:8px; }
+.ens-app .nav-entry { display:block; margin:12px 0 8px; font-family:system-ui,sans-serif; font-size:14px; }
+.ens-app .nav-entry textarea { display:block; width:100%; margin-top:6px; box-sizing:border-box; }
+.ens-app .nav-step { border-top:1px solid var(--ens-line); margin-top:12px; padding-top:10px; }
+.ens-app .nav-step code { overflow-wrap:anywhere; }
+.ens-app #turns strong { overflow-wrap:anywhere; } /* long claim ids in human-turn titles wrap on phones */
 @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
