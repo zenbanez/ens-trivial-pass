@@ -27,6 +27,8 @@ async function freePort() {
     browser=await chromium.launch({channel:process.env.ENS_BROWSER_CHANNEL || 'msedge',headless:true});
     const page=await browser.newPage({viewport:{width:1360,height:1050}});
     page.on('pageerror',e=>errors.push(e.message));
+    let navPhase=false; const navRequests=[];
+    page.on('request',r=>{if(navPhase)navRequests.push(r.url());});
     await page.route('**/*',route=>{
       const url=route.request().url();
       if(!url.startsWith(base+'/')){external.push(url);return route.abort();}
@@ -143,9 +145,69 @@ async function freePort() {
     await page.locator('#verify-trail-btn').click();
     await page.waitForFunction(()=>ensUI.snapshot().trailVerified!==null);
     assert.equal((await page.evaluate(()=>ensUI.snapshot())).trailVerified,true);
+    // D-025: Navigation — the teacher's own next step, model off, same trail.
+    navPhase=true;
+    await page.getByRole('link',{name:'Decide the next step →',exact:true}).click();
+    await page.locator('#ens-view-navigation').waitFor({state:'visible'});
+    assert.equal(await page.evaluate(()=>location.hash),'#navigation');
+    assert.equal(await page.locator('#nav-limiter').isVisible(),true,'limiter in frame');
+    assert.match(await page.locator('#nav-limiter').innerText(),/The teacher’s decision, not a model recommendation\. No model runs on this page\./);
+    assert.equal(await page.locator('[data-nav-card]').count(),1,'one card per signed claim only');
+    assert.match(await page.locator(`[data-nav-card="${first.id}"]`).innerText(),/CONTESTED/);
+    assert.match(await page.locator('#nav-pending').innerText(),/3 proposed claims are not signed yet/);
+    let before=await page.evaluate(()=>ensUI.snapshot());
+    await page.locator(`[data-nav-record="${first.id}"]`).click();
+    assert.match(await page.locator(`[data-nav-note="${first.id}"]`).innerText(),/Not recorded: the next step is empty/);
+    assert.equal((await page.evaluate(()=>ensUI.snapshot())).crumbs.length,before.crumbs.length,'a rejected step writes no crumb');
+    const stepText='Tomorrow I will ask Amara to explain the strips to a partner first.';
+    await page.locator(`[data-nav-text="${first.id}"]`).fill(stepText);
+    await page.locator(`[data-nav-record="${first.id}"]`).click();
+    await page.waitForFunction(n=>ensUI.snapshot().crumbs.length===n+1,before.crumbs.length);
+    let after=await page.evaluate(()=>ensUI.snapshot());
+    const step1=after.crumbs.at(-1);
+    assert.equal(step1.action,'ens.navigation.next_step');
+    assert.deepEqual({...step1.context,next_step_hash:undefined},{note:step1.context.note,claim:first.id,author:'teacher',model_off:true,next_step:stepText,next_step_hash:undefined,contested_at_decision:true,supersedes:null});
+    assert.equal(step1.context.next_step_hash,'sha256:'+createHash('sha256').update(stepText).digest('hex'));
+    // Freshness (scope §4a, Sol's R1): the earlier check must not cover the new record.
+    assert.equal(after.trailVerified,null,'recording resets verification to unchecked');
+    assert.equal(await page.locator('#verify-trail-result').textContent(),`The trail changed after the last check. That check covered ${before.crumbs.length} crumbs; the trail now has ${after.crumbs.length}. Verify again.`);
+    assert.equal(await page.locator(`[data-nav-card="${first.id}"] .nav-step`).isVisible(),true);
+    await page.locator('#view-console').click();
+    assert.match(await page.locator('#checklist').innerText(),/OPEN\s+Trail recomputes/);
+    assert.match(await page.locator('#checklist').innerText(),/Next steps recorded[\s\S]*1\/1 signed/);
+    await page.locator('#verify-trail-btn').click();
+    await page.waitForFunction(()=>ensUI.snapshot().trailVerified===true);
+    assert.match(await page.locator('#verify-trail-result').textContent(),new RegExp(`${after.crumbs.length}/${after.crumbs.length} crumb hashes recompute`),'fresh check covers the new count');
+    // Revision appends a crumb naming the one it supersedes; the first stays.
+    await page.evaluate(()=>ensUI.navigate('navigation'));
+    await page.locator(`[data-nav-revise="${first.id}"]`).click();
+    await page.locator(`[data-nav-text="${first.id}"]`).fill(stepText+' Then I will check her strips with her.');
+    await page.locator(`[data-nav-record="${first.id}"]`).click();
+    await page.waitForFunction(n=>ensUI.snapshot().crumbs.length===n+1,after.crumbs.length);
+    const revised=await page.evaluate(()=>ensUI.snapshot());
+    assert.equal(revised.crumbs.at(-1).context.supersedes,step1.warrant_id);
+    assert.ok(revised.crumbs.some(c=>c.warrant_id===step1.warrant_id),'earlier step preserved');
+    assert.equal(revised.trailVerified,null,'revision also resets verification');
+    assert.match(await page.locator('#verify-trail-result').textContent(),new RegExp(`covered ${after.crumbs.length} crumbs; the trail now has ${revised.crumbs.length}[.]`));
+    await page.locator('#view-console').click();
+    await page.locator('#verify-trail-btn').click();
+    await page.waitForFunction(()=>ensUI.snapshot().trailVerified===true);
+    // Tamper: changing the recorded words in the crumb itself fails recomputation.
+    await page.evaluate(id=>{crumbs.find(c=>c.warrant_id===id).context.next_step+='!';},step1.warrant_id);
+    await page.locator('#verify-trail-btn').click();
+    await page.waitForFunction(()=>ensUI.snapshot().trailVerified===false);
+    await page.evaluate(([id,t])=>{crumbs.find(c=>c.warrant_id===id).context.next_step=t;},[step1.warrant_id,stepText]);
+    await page.locator('#verify-trail-btn').click();
+    await page.waitForFunction(()=>ensUI.snapshot().trailVerified===true);
+    navPhase=false;
+    assert.deepEqual(navRequests,[],'no request leaves the page while Navigation is used');
+    assert.equal((await page.evaluate(()=>ensUI.snapshot())).sessionId,original.sessionId,'same session through Navigation');
+    await page.evaluate(()=>ensUI.navigate('navigation'));
+    await page.getByRole('link',{name:'Where does this go next? →',exact:true}).click();
+    await page.locator('[data-story="next"]').waitFor({state:'visible'});
     for(const width of [1360,1024,390,320]){
       await page.setViewportSize({width,height:1100});
-      for(const target of ['idea','slice','next','vision','debrief-panel','gate-panel','manual-panel','twin-panel','trail-panel','console']){
+      for(const target of ['idea','slice','next','vision','debrief-panel','gate-panel','manual-panel','twin-panel','trail-panel','console','navigation']){
         await page.evaluate(t=>ensUI.navigate(t),target);
         if(target==='vision'){
           const ordered=await page.locator('.ens-vision-feature').evaluateAll((rows,wide)=>rows.every((row,index)=>{
@@ -171,6 +233,6 @@ async function freePort() {
     await page.waitForFunction(()=>window.scrollY===0);
     if(process.env.ENS_UI_SCREENSHOT_DIR){fs.mkdirSync(process.env.ENS_UI_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.ENS_UI_SCREENSHOT_DIR,'ens-d017-opening.png'),fullPage:true});}
     assert.deepEqual(errors,[],'no page script errors');assert.deepEqual(external,[],'no external network');
-    console.log('PASS: PNG/MJS served correctly; no startup model call; HELD; labelled stub path; manual model-off; sign-off/contest; same session/claims/trail across views; bidirectional record links; real hash recomputation; desktop/mobile overflow; no script errors or external requests.');
+    console.log('PASS: PNG/MJS served correctly; no startup model call; HELD; labelled stub path; manual model-off; sign-off/contest; same session/claims/trail across views; bidirectional record links; real hash recomputation; Navigation next step (model off, no requests, freshness reset, revision appends, tamper fails); desktop/mobile overflow; no script errors or external requests.');
   } finally {if(browser)await browser.close();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

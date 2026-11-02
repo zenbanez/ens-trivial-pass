@@ -73,7 +73,7 @@
     document.dispatchEvent(new CustomEvent('ens:selection',{detail:{view,...detail}}));
   }
   function renderNavigation() {
-    ['intro','review','console'].forEach(name=>{byId(`ens-view-${name}`).hidden=name!==view;});
+    ['intro','review','console','navigation'].forEach(name=>{byId(`ens-view-${name}`).hidden=name!==view;});
     document.body.dataset.ensView=view;
     byId('console-panel').hidden=view!=='console';
     const trailHost=byId(view==='console'?'ens-console-trail':'ens-review-trail');
@@ -99,16 +99,18 @@
   function navigate(target, detail={}) {
     const previous=`${view}/${chapter}/${step}`;
     if(target==='console')view='console';
+    else if(target==='navigation')view='navigation'; // D-025: the teacher's next step
     else if(target==='review'){view='review'; if(Number.isInteger(detail.step))step=Math.max(0,Math.min(4,detail.step)); if(detail.claimId)step=3;}
     else if(chapters.has(target)){view='intro';chapter=target;}
     else if(panelIds.includes(target)){view='review';step=panelIds.indexOf(target);}
     else return false;
     // Keep button/event navigation and native fragment links on the same route.
     // Otherwise returning to an already-current hash emits no hashchange.
-    const route=view==='intro'?chapter:view==='review'?panelIds[step]:'console';
+    const route=view==='intro'?chapter:view==='review'?panelIds[step]:view;
     if(location.hash!==`#${route}`)history.replaceState(null,'',`#${route}`);
     renderNavigation();
     if(view==='console' && typeof renderConsole==='function')renderConsole();
+    if(view==='navigation' && typeof renderNavigationPage==='function')renderNavigationPage();
     if((detail.warrantId || detail.claimId) && !window.ENSConsole)requestAnimationFrame(()=>selectRecord(detail));
     if(!detail.warrantId && !detail.claimId && previous!==`${view}/${chapter}/${step}`)requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'}));
     return true;
