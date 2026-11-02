@@ -120,6 +120,27 @@ operator review of endpoint access and model-call controls. Do not use real data
 the same browser state. The console labels code, model and human turns rather
 than presenting every step as AI reasoning.
 
+## Where it fits: outcomes and the LMS
+
+**Existing practice.** Schools already plan and report against learning
+outcomes; in the Philippines, outcomes-based education and DepEd's learning
+competencies. A grade summarises how a learner did against them. ENS keeps
+what sits under such a summary: the teacher's observation, the claim it
+supports, and the teacher's decision to keep or contest it. **Mapping claims
+to a school's own outcomes is the next step, and it is not built in this
+slice.** No claim here is aligned to any curriculum.
+
+**Beside an LMS, not instead of one.** A learning-management system such as
+Canvas tracks outcomes through scored work: an outcome has a mastery
+threshold, scores come from aligned assignments and rubrics, and a
+calculation method (for example a decaying average) rolls them up in a
+Learning Mastery Gradebook
+([Canvas Outcomes API](https://canvas.instructure.com/doc/api/outcomes.html),
+[Outcome Results](https://developerdocs.instructure.com/services/canvas/resources/outcome_results)).
+ENS records why: the quoted observation under each claim, the teacher's
+sign-off or contest, and a trail that recomputes. It is meant to sit beside
+an LMS, not to replace one, and this slice has no LMS integration.
+
 ## Meta models: what runs, and what does not
 
 | Leg | Model | Status in this submission |
