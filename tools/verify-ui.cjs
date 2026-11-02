@@ -189,6 +189,14 @@ async function freePort() {
     assert.ok(revised.crumbs.some(c=>c.warrant_id===step1.warrant_id),'earlier step preserved');
     assert.equal(revised.trailVerified,null,'revision also resets verification');
     assert.match(await page.locator('#verify-trail-result').textContent(),new RegExp(`covered ${after.crumbs.length} crumbs; the trail now has ${revised.crumbs.length}[.]`));
+    // A second record before re-verifying keeps the first check's count and updates the current one (D-028 finding).
+    await page.locator(`[data-nav-revise="${first.id}"]`).click();
+    await page.locator(`[data-nav-text="${first.id}"]`).fill(stepText+' Then I will check her strips with her, and ask her to explain one.');
+    await page.locator(`[data-nav-record="${first.id}"]`).click();
+    await page.waitForFunction(n=>ensUI.snapshot().crumbs.length===n+1,revised.crumbs.length);
+    const twice=await page.evaluate(()=>ensUI.snapshot());
+    assert.equal(twice.trailVerified,null,'still unchecked after a second record');
+    assert.equal(await page.locator('#verify-trail-result').textContent(),`The trail changed after the last check. That check covered ${after.crumbs.length} crumbs; the trail now has ${twice.crumbs.length}. Verify again.`);
     await page.locator('#view-console').click();
     await page.locator('#verify-trail-btn').click();
     await page.waitForFunction(()=>ensUI.snapshot().trailVerified===true);
