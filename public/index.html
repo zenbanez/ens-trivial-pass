@@ -52,9 +52,8 @@
     <div id="gates"></div>
     <fieldset>
       <legend>Gate 9 — Processing Locus: where does extraction run?</legend>
-      <label><input type="radio" name="locus" value="hosted" checked> Hosted API (a third-party service extracts the sightings)</label>
-      <label><input type="radio" name="locus" value="local"> Declared local locus (this machine, named operator, pinned extractor — strictly local: local Ollama model on this machine, never a hosted API)</label>
-      <label><input type="radio" name="locus" value="hosted-synthetic"> Hosted, synthetic demo only (expressly authorized: synthetic text is sent to the Meta Model API; NOT Gate 9 compliance for real learner data)</label>
+      <label><input type="radio" name="locus" value="hosted"> Hosted API (a third-party service extracts the sightings)</label>
+      <label><input type="radio" name="locus" value="local" checked> Declared local locus (this machine, named operator, pinned extractor — strictly local: local Ollama model on this machine, never a hosted API) <strong>★ Recommended for testing</strong></label>
     </fieldset>
     <div id="gate9-walk"></div>
     <p id="disposition" class="disposition"></p>
@@ -109,7 +108,7 @@
 <div class="ens-after-demo"><a href="#trail-panel">Inspect the trail with the teacher →</a><a class="ens-button ens-primary" href="#next">Where does this go next? →</a></div>
 </div>
 </main>
-<footer class="ens-footer"><p><strong>The Trivial Pass, Made Real.</strong> A bounded synthetic-only ENS research demo. Broader vision and proposed next steps are not implemented capabilities or evidence of educational validity.</p><p>Extraction: local Ollama model at the declared local locus, with explicitly labelled LOCAL STUB fallback only if unavailable; Meta API only on the expressly authorized hosted-synthetic path. A declared local label is not containment telemetry. The advisory judge never admits, signs, or blocks.</p><p>ENS is research under governed validation; no ENS adoption, DepEd representation, legal or institutional compliance claim. All runtime outputs and records remain inspectable in the same session.</p></footer>
+<footer class="ens-footer"><p><strong>The Trivial Pass, Made Real.</strong> A bounded synthetic-only ENS research demo. Broader vision and proposed next steps are not implemented capabilities or evidence of educational validity.</p><p>Extraction: local Ollama model at the declared local locus, with explicitly labelled LOCAL STUB fallback only if unavailable. No hosted model path exists in this build. A declared local label is not containment telemetry. The advisory judge never admits, signs, or blocks.</p><p>ENS is research under governed validation; no ENS adoption, DepEd representation, legal or institutional compliance claim. All runtime outputs and records remain inspectable in the same session.</p></footer>
 <script src="app.js"></script>
 <script src="liveness.js"></script>
 <script type="module" src="manual-sighting.mjs"></script>

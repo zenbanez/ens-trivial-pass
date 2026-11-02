@@ -27,7 +27,7 @@ during the hackathon. See [previous work and team disclosure](DISCLOSURE.md).
 | Access | Status |
 |---|---|
 | Local application | Available: [run with Node or Docker](#run-locally), then open http://127.0.0.1:4173 |
-| Public hosted deployment | Live: https://ens.banezglobal.com/ (Firebase App Hosting, full stack, verified: config honest with no key, extraction degrades to the labelled LOCAL STUB without Ollama). No Meta key is deployed; the hosted-synthetic route refuses without one. |
+| Public hosted deployment | Live: https://ens.banezglobal.com/ (Firebase App Hosting, full stack, verified). No hosted model is used anywhere: extraction runs at the declared local locus (local Ollama model when reachable, otherwise the labelled LOCAL STUB). |
 | Recorded video walkthrough | **Pending filming and publication.** No completed video URL is published here yet. |
 
 These pending entries are status slots, not finished deliverables. The lead
@@ -38,10 +38,11 @@ a successful local run does not by itself establish a public deployment.
 
 1. **The idea and the slice.** Begin with what ENS is trying to support,
    then narrow to one synthetic classroom debrief.
-2. **A channel that can be held.** In the guided walkthrough, the default
-   hosted route is HELD. Gate 9 asks where extraction will run. Choosing a
-   declared local locus produces the qualified disposition **admitted on
-   specification, not on evidence**; containment telemetry is not demonstrated.
+2. **A channel that can be held.** In the guided walkthrough, the hosted
+   route is HELD. Gate 9 asks where extraction will run. The declared
+   local locus is the recommended testing path and produces the qualified
+   disposition **admitted on specification, not on evidence**; containment
+   telemetry is not demonstrated.
 3. **Evidence before interpretation.** Run extraction on the declared local
    path. Check the actual source label: local Ollama if available, otherwise
    **LOCAL STUB · not a model**. Quotes must pass deterministic checks before
@@ -62,7 +63,7 @@ The advisory judge is optional and requires a working local model. Its flags
 never admit, sign, reject or block a claim. A failed judge must remain visibly
 failed, not be narrated as a successful or merely uncertain answer.
 
-For a short review, follow the default HELD route, switch to declared local,
+For a short review, note the HELD hosted route, switch to the recommended declared local locus,
 inspect a proposed claim, sign or contest it, and open its record in Console.
 Model latency is hardware-dependent. A recorded demonstration must distinguish
 real inference, an explicitly labelled stub, and any pre-run or sped-up footage.
@@ -126,7 +127,6 @@ than presenting every step as AI reasoning.
 | Sighting extraction at the declared local locus | Muse Glimmer (open weights) via local Ollama | Demonstrated |
 | Advisory DecisionJudge | the same local Muse Glimmer | Demonstrated |
 | Jev adapter for the judge | — | Seam only: not wired, never called |
-| Hosted extraction, synthetic only | Meta Model API, `muse-spark-1.3` | Implemented, not exercised for this submission |
 
 **Local extraction.** The extractor runs at temperature 0. The Agent
 Console shows the exact prompt sent and the raw model output, before code
@@ -151,21 +151,12 @@ see [judge/README.md](judge/README.md).
 **Jev.** The judge's adapter interface has a Jev slot, but it refuses every
 call: Jev is not wired, and no Jev call has been made from this repository.
 
-**Hosted extraction** uses the Responses API (the
-`meta-models/legal-agent-workshop` convention: an OpenAI-compatible client
-pointed at `api.meta.ai`). It needs both a key, supplied **via environment
-only** (never committed), and the operator's authorization on the server:
-
-```bash
-MODEL_API_KEY=... HOSTED_SYNTHETIC_AUTHORIZED=1 node server.mjs
-# optional: MODEL_API_BASE_URL (default https://api.meta.ai/v1),
-#           MODEL_API_MODEL  (default muse-spark-1.3)
-```
-
-Without both, the hosted-synthetic option refuses. A client's claim of
-admission is not enough. The Gate 9 held disposition fires *before* any
-hosted call would be made. Hosted runs take one attempt, with no retry
-loop.
+**No hosted extraction exists in this build.** The previously implemented
+hosted-synthetic demo path was removed as confusing: every extraction
+runs at the declared local locus only, and the server has no hosted
+model endpoint. The Gate 9 held disposition fires for the undeclared
+hosted route before any extraction would be made. The local path takes
+up to two bounded retries, then escalates to the teacher.
 
 Local execution depends on the operator's configured endpoints. A model name
 and a selected local label are not proof of pinned weight bytes, blocked
@@ -197,8 +188,7 @@ configured local judge; it is not the mocked test suite.
 - **Synthetic-only operation.** Amara, Ben and Cora are fictional and labelled.
   The demo has no user accounts or durable learner database. Browser session
   state is in memory; the server retains a bounded in-memory retry-rejection
-  cache, and users may export the trail. Hosted inference transmits the
-  submitted synthetic text to the configured provider. Do not enter real data.
+cache, and users may export the trail. Do not enter real data.
 - **Worked-case boundaries.** The displayed gate walk is a demonstration of
   specified conditions, not comprehensive organizational admission review.
   The UI does not prove Gate 9 enforcement telemetry or legal compliance.
@@ -228,7 +218,7 @@ and tests desktop/mobile layouts. See [UI contract](UI-REDESIGN.md).
 
 | Read the code | Purpose |
 |---|---|
-| [server.mjs](server.mjs) | Static serving, extraction routes, hosted authorization, coverage and local judge integration |
+| [server.mjs](server.mjs) | Static serving, the local extraction route, coverage and local judge integration |
 | [public/app.js](public/app.js) | Gate walk, quote verification, heuristic proposals, human actions and crumbs |
 | [judge/](judge/README.md) | Advisory framework, local adapter and calibration runner |
 | [fixtures/ground-truth.mjs](fixtures/ground-truth.mjs) | Synthetic evidence and bounded coverage fixtures |
