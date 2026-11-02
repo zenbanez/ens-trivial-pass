@@ -43,9 +43,10 @@ fairness, the boundary is stated plainly.
    during the hackathon; prompts, tool, and file hashes are recorded
    in `ART-PROVENANCE.md`. They are presentation artwork, not evidence
    or capability claims.
-- The deterministic LOCAL STUB extractor (labelled scaffolding, not a
-  model) and the Meta Model API integration (Responses API,
-  `MODEL_API_*` environment convention).
+ - The deterministic LOCAL STUB extractor (labelled scaffolding, not a
+   model) and the local Ollama extraction path (Meta Muse Glimmer via
+   `OLLAMA_*` environment convention). No hosted model integration
+   exists in this build.
 - This README set, including the demo narrative and this disclosure.
 
 ## Third-party and pattern sources
@@ -55,9 +56,9 @@ fairness, the boundary is stated plainly.
   the pattern taught in Meta's own hackathon workshop
   (`meta-models/legal-agent-workshop`, Agents 101), adopted here on
   27 October 2026 and credited in the README.
-- **Models/APIs:** Meta Muse models via the Meta Model API when a key
-  is supplied (environment only, never committed). No other third-party
-  code: the server and client are dependency-free.
+ - **Models/APIs:** Meta Muse Glimmer via local Ollama only. No hosted
+   model calls exist in this build. No other third-party
+   code: the server and client are dependency-free.
 - **AI assistance:** this implementation was written with AI coding
   assistance (Muse Wonder leading integration, Sol on UI/screens,
   Subok on the Agent Console and verification, zen4 on the demo

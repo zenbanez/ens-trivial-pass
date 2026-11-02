@@ -14,7 +14,7 @@ async function freePort() {
 }
 (async()=>{
   const port=await freePort(), base=`http://127.0.0.1:${port}`;
-  const server=spawn(process.execPath,['server.mjs'],{cwd:repo,windowsHide:true,env:{...process.env,PORT:String(port),MODEL_API_KEY:'',HOSTED_SYNTHETIC_AUTHORIZED:'0',OLLAMA_BASE_URL:'http://127.0.0.1:9'},stdio:'pipe'});
+  const server=spawn(process.execPath,['server.mjs'],{cwd:repo,windowsHide:true,env:{...process.env,PORT:String(port),OLLAMA_BASE_URL:'http://127.0.0.1:9'},stdio:'pipe'});
   let browser;
   const errors=[], external=[]; let localAttempts=0;
   try {
@@ -94,6 +94,7 @@ async function freePort() {
     await page.getByRole('link',{name:'Follow this observation'}).click();
     await page.locator('#debrief-panel').waitFor({state:'visible'});
     await page.locator('[data-review-step="1"]').click();
+    await page.locator('input[name=locus][value=hosted]').check();
     assert.equal(await page.locator('#extract-btn').isDisabled(),true,'held locus never enables extraction');
     await page.locator('input[name=locus][value=local]').check();
     assert.equal(await page.locator('#extract-btn').isEnabled(),true);

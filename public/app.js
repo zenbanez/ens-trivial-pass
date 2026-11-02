@@ -44,18 +44,7 @@ const GATE9 = {
     disposition: 'ADMITTED ON THE SPECIFICATION, with binding conditions — not admitted on evidence. A real channel is admitted only when condition 6 has actually been exercised.',
     admitted: true,
   },
-  'hosted-synthetic': {
-    walk: [
-      ['1. Declared Locus', 'Pass — synthetic only', 'The registration names the Meta Model API endpoint and model, and its operator. Declared, not hidden.'],
-      ['2. Boundary Containment', 'Synthetic only', 'No learner content exists in this demo: every learner is a synthetic persona. With real learner content this condition FAILS and the channel is HELD.'],
-      ['3. In-Flight Transit Scope', 'Authorized', 'Synthetic debrief text crosses to the declared endpoint, expressly authorized by the operator for this demonstration.'],
-      ['4. Instrument Identity and Held Weights', 'Declared', 'The model id is named in every crumb. A hosted model can change under that id; for real data this condition requires held weights and would FAIL here.'],
-      ['5. Capability-Gap Posture', 'Not invoked', 'This path exists because the data is synthetic, not because local capability is absent.'],
-      ['6. Technical Enforcement Evidence', 'Outstanding', 'No telemetry is produced. Nothing here is evidence a real channel would be safe.'],
-    ],
-    disposition: 'ADMITTED FOR SYNTHETIC DATA ONLY — an expressly authorized demonstration path. This is NOT Gate 9 compliance: the same channel carrying a real debrief would be HELD at conditions 2 and 4.',
-    admitted: true,
-  },
+
 };
 
 // --- warrant crumbs (Warrants v0 minimal shape) ---
@@ -302,10 +291,9 @@ async function runExtraction() {
   const regNote = {
     hosted: 'Channel HELD at Gate 9: undeclared hosted locus; extraction refused',
     local: 'Channel admitted ON SPECIFICATION under Gate 9 declared local locus; condition 6 outstanding; extraction strictly local (local Ollama model on this machine; no hosted API call)',
-    'hosted-synthetic': 'Channel admitted FOR SYNTHETIC DATA ONLY under expressly authorized hosted path; NOT Gate 9 compliance for real learner data',
   }[locus];
   const reg = await crumb('ens.channel.register', 'channel:post-class-debrief', regNote,
-    { locus, gate9: locus === 'hosted' ? 'held' : locus === 'local' ? 'admitted-on-specification' : 'admitted-synthetic-only', synthetic_only: locus === 'hosted-synthetic' });
+    { locus, gate9: locus === 'local' ? 'admitted-on-specification' : 'held' });
   turn('GATE', `channel_admit(locus="${locus}")`, regNote, JSON.stringify(reg, null, 2));
   await waitStep();
   if (locus === 'hosted') { renderTwin(); renderConsole(); return; }
@@ -343,24 +331,6 @@ async function runExtraction() {
       } catch (e) {
         sightings = stubExtract(text);
         extractorLabel = `LOCAL STUB — not a model (local model unavailable: ${e.message}; stub carried this run, on this machine only)`;
-      }
-    } else {
-      // hosted-synthetic: single attempt (retry loop is out of scope for live hosted per D-009)
-      try {
-        const res = await fetch('/api/extract', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ text, learners: LEARNERS.map((l) => l.name), gate: { mode: 'hosted-synthetic', admitted: true, syntheticOnly: true } }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `server ${res.status}`);
-        sightings = data.sightings;
-        sightings._serverRejected = data.rejectedDetails || [];
-        extractorLabel = `Meta model via API (${data.locus?.model || meta.model}) at ${data.locus?.endpoint || 'declared endpoint'} — synthetic data sent, expressly authorized`;
-      } catch (e) {
-        await crumb('ens.evidence.reject', 'debrief:demo', `Hosted-synthetic extraction refused/failed: ${e.message}. No fallback applied in this mode.`, { locus });
-        $('extractor-note').textContent = `Hosted-synthetic extraction did not run: ${e.message}. Configure MODEL_API_KEY on the server, or use the declared local locus.`;
-        renderTwin();
-        return;
       }
     }
 
@@ -439,9 +409,8 @@ async function runExtraction() {
   }
 
   const runNo = ++RUN_SEQ;
-  await crumb('ens.evidence.extract', 'debrief:demo', locus === 'local'
-    ? `Extraction ran at the declared local locus (this machine; extractor: ${extractorLabel}); ${finalVerifiedSightings.length} verified sighting(s), ${finalRejectedSightings.length} rejected`
-    : `Extraction ran via the expressly authorized hosted-synthetic path; synthetic debrief text was sent to the declared Meta endpoint; ${finalVerifiedSightings.length} verified sighting(s), ${finalRejectedSightings.length} rejected`,
+  await crumb('ens.evidence.extract', 'debrief:demo',
+    `Extraction ran at the declared local locus (this machine; extractor: ${extractorLabel}); ${finalVerifiedSightings.length} verified sighting(s), ${finalRejectedSightings.length} rejected`,
   { extractor: extractorLabel, locus, parent: reg.warrant_id, run: runNo, debrief_hash: 'sha256:' + (await sha256Hex(text)) });
 
   SIGHTINGS = [...SIGHTINGS, ...finalVerifiedSightings];
@@ -536,7 +505,7 @@ $('export-btn').addEventListener('click', () => {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'trail-export.json' });
   a.click();
 });
-fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = c.metaConfigured ? `Meta API configured (${c.model}); hosted-synthetic server authorization is ${c.hostedSyntheticAuthorized ? 'ON' : 'OFF (operator must set HOSTED_SYNTHETIC_AUTHORIZED=1)'}. The model is called ONLY on that authorized path; the declared local locus never contacts it.` : 'Meta API not configured. Local locus runs the local Ollama model on this machine (deterministic LOCAL STUB only if that model is unavailable); hosted-synthetic will refuse.'; }).catch(() => {});
+fetch('/api/config').then((r) => r.json()).then((c) => { meta = c; $('extractor-note').textContent = `Declared local locus runs the local Ollama model (${c.localModel || 'muse-glimmer'}) on this machine${c.ollamaReachable === false ? ' (unreachable right now: the labelled LOCAL STUB will carry the run)' : ''}; there is no hosted path in this build.`; }).catch(() => {});
 $('verify-trail-btn')?.addEventListener('click', async () => {
   let bad = 0;
   for (const c of crumbs) {

@@ -5,7 +5,6 @@
 (() => {
   const LABELS = {
     live_local: { text: 'LIVE · local', tone: 'live', means: 'The local model ran on this machine, just now.' },
-    live_hosted: { text: 'LIVE · hosted (synthetic only)', tone: 'live', means: 'The hosted Meta model ran, under the authorized synthetic-only gate.' },
     stub: { text: 'LOCAL STUB · not a model', tone: 'plain', means: 'Deterministic code stood in because the local model was unavailable.' },
     manual: { text: 'MANUAL ENTRY', tone: 'plain', means: 'A person typed the sighting; no model was involved.' },
     fixture: { text: 'FIXTURE', tone: 'plain', means: 'A stored sample answer was replayed, not a live call.' },
@@ -31,7 +30,6 @@
       case 'EXTRACT':
       case 'RETRY':
         if (/LOCAL STUB/.test(title)) return LABELS.stub;
-        if (/Meta model via API/.test(title)) return LABELS.live_hosted;
         if (/Ollama local model/.test(title)) return LABELS.live_local;
         return LABELS.fixture;
       case 'JUDGE': {
@@ -52,7 +50,6 @@
   function forClaim(c) {
     const source = c?.source === 'manual' ? LABELS.manual
       : /LOCAL STUB/.test(c?.extractor || '') ? LABELS.stub
-      : /Meta model via API/.test(c?.extractor || '') ? LABELS.live_hosted
       : /Ollama local model/.test(c?.extractor || '') ? LABELS.live_local
       : LABELS.fixture;
     return { source, judge: c?.judgment ? (judgeFailed(c.judgment) ? LABELS.judge_failed : LABELS.live_local) : null };

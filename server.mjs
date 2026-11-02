@@ -11,15 +11,6 @@ import { scoreCoverage, COVERAGE_THRESHOLD, SAMPLE_DEBRIEF, GROUND_TRUTH_FIXTURE
 
 const root = fileURLToPath(new URL('./public', import.meta.url));
 const PORT = process.env.PORT || 4173;
-// Meta Model API, per the meta-models/legal-agent-workshop convention:
-// OpenAI-compatible client pointed at api.meta.ai, key from environment only.
-const MODEL_API_KEY = process.env.MODEL_API_KEY || '';
-const MODEL_API_BASE_URL = (process.env.MODEL_API_BASE_URL || 'https://api.meta.ai/v1').replace(/\/$/, '');
-const MODEL_API_MODEL = process.env.MODEL_API_MODEL || 'muse-spark-1.3';
-// Operator authorization for the hosted-synthetic path. The server, not the
-// page, holds this: a client claiming admission is refused unless the
-// operator has expressly enabled hosted-synthetic on the server.
-const HOSTED_SYNTHETIC_AUTHORIZED = /^(1|true|yes|on)$/i.test(process.env.HOSTED_SYNTHETIC_AUTHORIZED || '');
 // Local model via Ollama on this machine (the declared local locus). Default
 // model is Muse Glimmer, an open Meta model; OLLAMA_MODEL can name another
 // local model (e.g. a smaller Qwen) without changing the locus claim.
@@ -132,31 +123,11 @@ function verifySightings(raw, text, learners) {
   return { sightings, rejected };
 }
 
-async function extractWithMeta(text, learners) {
-  const prompt = [
-    'You extract sightings from a teacher post-class debrief. The learners are SYNTHETIC demo personas.',
-    'Return ONLY JSON: {"sightings":[{"learner":"<name>","quote":"<exact substring of the debrief>","observation":"<what was observed, no interpretation beyond the quote>"}]}',
-    'Use only these learner names:', learners.join(', '),
-    'Debrief:', text,
-  ].join('\n');
-  // Responses API (client.responses.create in the workshop's Python kit).
-  const res = await fetch(`${MODEL_API_BASE_URL}/responses`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${MODEL_API_KEY}` },
-    body: JSON.stringify({ model: MODEL_API_MODEL, input: prompt, temperature: 0 }),
-  });
-  if (!res.ok) throw new Error(`Meta API ${res.status}`);
-  const data = await res.json();
-  const content = data.output_text || data.output?.flatMap((o) => o.content || []).find((c) => c.type === 'output_text')?.text || '{}';
-  const parsed = JSON.parse(content.replace(/^```json?|```$/gm, '').trim());
-  return (parsed.sightings || []).map((s) => ({ ...s, extractor: `meta:${MODEL_API_MODEL}` }));
-}
-
 const server = createServer(async (req, res) => {
   try {
     if (req.url === '/api/config') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ metaConfigured: Boolean(MODEL_API_KEY), model: MODEL_API_MODEL, baseUrl: MODEL_API_BASE_URL, hostedSyntheticAuthorized: HOSTED_SYNTHETIC_AUTHORIZED, localModel: OLLAMA_MODEL, ollamaBaseUrl: OLLAMA_BASE_URL }));
+      res.end(JSON.stringify({ localModel: OLLAMA_MODEL, ollamaBaseUrl: OLLAMA_BASE_URL }));
       return;
     }
     if (req.url === '/api/judge' && req.method === 'POST') {
@@ -275,54 +246,7 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify(report));
       return;
     }
-    if (req.url === '/api/extract' && req.method === 'POST') {
-      let body = '';
-      for await (const chunk of req) { body += chunk; if (body.length > 65536) { res.writeHead(413, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'request too large' })); return; } }
-      let parsed;
-      try { parsed = JSON.parse(body || '{}'); } catch {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'request body is not valid JSON' }));
-        return;
-      }
-      const { text, learners, gate } = parsed;
-      if (typeof text !== 'string' || text.length > 20000 || !Array.isArray(learners)) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'expected {text: string (<=20000 chars), learners: string[]}' }));
-        return;
-      }
-      // The server enforces the gate, not just the page (D-004 V2): the model
-      // is reachable only on the expressly authorized hosted-synthetic path.
-      // Every other gate decision — held, local, or absent — is refused here.
-      if (!gate || gate.mode !== 'hosted-synthetic' || gate.admitted !== true || gate.syntheticOnly !== true) {
-        res.writeHead(403, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Gate 9: extraction refused. The model endpoint is reachable only on the expressly authorized hosted-synthetic path (synthetic data only).', gate: gate ?? null }));
-        return;
-      }
-      if (!HOSTED_SYNTHETIC_AUTHORIZED) {
-        res.writeHead(403, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Gate 9: hosted-synthetic is not authorized on this server. The operator must set HOSTED_SYNTHETIC_AUTHORIZED=1 to enable it; a client claim of admission is not sufficient.' }));
-        return;
-      }
-      if (!MODEL_API_KEY) {
-        res.writeHead(501, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Meta API not configured; the client uses its labelled LOCAL STUB.' }));
-        return;
-      }
-      let raw;
-      try { raw = await extractWithMeta(text, learners); } catch (e) {
-        res.writeHead(502, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: `upstream model call failed: ${e.message}` }));
-        return;
-      }
-      // Verification lives in code, outside the model (the workshop pattern):
-      // a sighting is accepted only if its learner is whitelisted, its quote
-      // is nonempty, and the quote is verbatim in the debrief.
-      const { sightings, rejected } = verifySightings(raw, text, learners);
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ sightings, rejected: rejected.length, rejectedDetails: rejected, locus: { mode: 'hosted-synthetic', endpoint: MODEL_API_BASE_URL, model: MODEL_API_MODEL, syntheticOnly: true } }));
-      return;
-    }
-    const path = normalize(join(root, req.url === '/' ? 'index.html' : req.url.split('?')[0]));
+        const path = normalize(join(root, req.url === '/' ? 'index.html' : req.url.split('?')[0]));
     if (!path.startsWith(root)) { res.writeHead(403); res.end('forbidden'); return; }
     const data = await readFile(path);
     res.writeHead(200, { 'content-type': MIME[extname(path)] || 'text/plain' });
@@ -334,5 +258,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`ENS Trivial Pass demo at http://127.0.0.1:${PORT} (Meta API ${MODEL_API_KEY ? `configured: ${MODEL_API_MODEL} @ ${MODEL_API_BASE_URL}` : 'not configured — extraction runs local (Ollama Glimmer) or the labelled LOCAL STUB'})`);
+  console.log(`ENS Trivial Pass demo at http://127.0.0.1:${PORT} (local-only build: extraction runs at the declared local locus via Ollama, or the labelled LOCAL STUB)`);
 });
