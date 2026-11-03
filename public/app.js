@@ -543,8 +543,10 @@ async function recordNextStep(claimId) {
     : 'Teacher records their own next step for this signed claim; model off, no suggestion shown', context);
   // Scope §4a (Sol's D-024 R1): an earlier verification must not present
   // itself as covering this new record. Back to unchecked until re-verified.
-  if (TRAIL_VERIFIED !== null) {
-    TRAIL_VERIFIED = null;
+  // The line is rewritten whenever any check has run, so a second record
+  // before re-verifying still shows the current count (D-028 finding).
+  TRAIL_VERIFIED = null;
+  if (TRAIL_VERIFIED_COUNT !== null) {
     $('verify-trail-result').textContent = N.staleVerifyNotice(TRAIL_VERIFIED_COUNT, crumbs.length);
   }
   turn('HUMAN', `next_step_record(${c.id})`, prior
