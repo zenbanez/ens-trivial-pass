@@ -28,7 +28,7 @@ during the hackathon. See [previous work and team disclosure](DISCLOSURE.md).
 |---|---|
 | Local application | Available: [run with Node or Docker](#run-locally), then open http://127.0.0.1:4173 |
 | Public hosted deployment | Live: https://ens.banezglobal.com/ (Firebase App Hosting, full stack, verified). No hosted model is used anywhere: extraction runs at the declared local locus (local Ollama model when reachable, otherwise the labelled LOCAL STUB). |
-| Recorded video walkthrough | **Pending filming and publication.** No completed video URL is published here yet. |
+| Recorded video walkthrough | Published: https://youtu.be/1YeQR8paSx8 (3-minute guided walkthrough of the slice, filmed against the D-026 filming board). |
 
 These pending entries are status slots, not finished deliverables. The lead
 will replace them with actual, checked URLs when available. A Dockerfile or
@@ -53,7 +53,13 @@ a successful local run does not by itself establish a public deployment.
 5. **Inspect the same run.** Open Agent Console from a claim, inspect the
    tools, turns and checklist, and follow its actual warrant record. Return
    to teacher review without creating a second session or replaying a canned run.
-6. **The next step and the Vision.** The concluding pages show proposed future
+6. **Navigation: the teacher's next step (`#navigation`).** From Agent Console,
+   choose **Decide the next step →**. For each teacher-signed claim (including
+   contested claims signed with eyes open), the teacher writes their own next
+   step by hand (`ens.navigation.next_step`, `model_off: true`). No model runs
+   on this page and no recommendation is generated; recording or revising a
+   step invalidates any earlier trail check until **Verify trail** is run again.
+7. **The next step and the Vision.** The concluding pages show proposed future
    work, not implemented recommendations. Their illustrations are AI-generated
    conceptual artwork, not model-run evidence.
 
@@ -114,7 +120,7 @@ operator review of endpoint access and model-call controls. Do not use real data
 | Extractor | Proposes sightings from the debrief, including quoted evidence and a learner name. |
 | Deterministic code | Checks allowed learner names, quote length, literal source matching and learner-name inclusion; proposes claim classes using fixed rules; records the workflow. These checks do not establish educational truth. |
 | Advisory DecisionJudge | Reads a proposed claim against its quote and learner, returning support, attribution and needs-support signals. It cannot take the teacher's decision. |
-| Teacher | Authors observations, signs proposed claims into the Twin and contests claims. No model calls the sign-off control. |
+| Teacher | Authors observations, signs proposed claims into the Twin, contests claims, and records their own next step per signed claim on `#navigation`. No model calls sign-off or next-step recording. |
 
 **One session, one trail, two views:** guided review and Agent Console inspect
 the same browser state. The console labels code, model and human turns rather
@@ -246,8 +252,8 @@ and tests desktop/mobile layouts. See [UI contract](UI-REDESIGN.md).
 | [UI-REDESIGN.md](UI-REDESIGN.md) | Same-session UI contract and presentation boundaries |
 | [ART-PROVENANCE.md](ART-PROVENANCE.md) | Generated-art prompts, tool attribution and file hashes |
 
-- `node --test test/*.test.mjs` runs 41 unit tests, covering the
-  coverage scorer and retry loop, the DecisionJudge, and manual entry.
+- `node --test test/*.test.mjs` runs 47 unit tests, covering the
+  coverage scorer and retry loop, the DecisionJudge, manual entry, and Navigation.
   GitHub Actions runs them on every pull request and on pushes to `main`,
   on Node 20, 22 and 24.
 - `tools/verify-ui.cjs` and `tools/verify-shared-labels.cjs` drive the page
@@ -264,7 +270,8 @@ and tests desktop/mobile layouts. See [UI contract](UI-REDESIGN.md).
 **One human entrant:** Zen Bañez, steward, director and accountable submitter.
 AI collaborators supported the build: Muse Wonder led integration; Sol built
 the UI/screens; Subok built the Agent Console and supported verification;
-zen4 owns the demo narrative and filming board. See [DISCLOSURE.md](DISCLOSURE.md)
+zen4 owns the demo narrative; Linaw refreshed the filming board to the final
+build. See [DISCLOSURE.md](DISCLOSURE.md)
 for the previous-work boundary and contributor roles.
 
 The ENS specifications and the private ZenOS collaboration foundations existed
